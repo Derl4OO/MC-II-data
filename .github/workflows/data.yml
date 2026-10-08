@@ -1,0 +1,53 @@
+name: Data MotoCesta (CZ + SK)
+
+on:
+  schedule:
+    - cron: "0 3 2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nástroje
+        run: sudo apt-get update && sudo apt-get install -y osmium-tool
+      - name: Stažení OpenStreetMap (Geofabrik)
+        run: |
+          curl -sSfL -o cz.osm.pbf https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
+          curl -sSfL -o sk.osm.pbf https://download.geofabrik.de/europe/slovakia-latest.osm.pbf
+      - name: Výběr silnic, radarů a benzinek
+        run: |
+          mkdir -p work
+          for c in cz sk; do
+            osmium tags-filter $c.osm.pbf w/highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary,secondary_link,tertiary,tertiary_link,unclassified,residential,living_street -o roads-$c.pbf
+            osmium add-locations-to-ways roads-$c.pbf -f opl,add_metadata=false -o work/roads-$c.opl
+            osmium tags-filter $c.osm.pbf n/highway=speed_camera -f opl,add_metadata=false -o work/cams-$c.opl
+            osmium tags-filter $c.osm.pbf nw/amenity=fuel -o fuel-$c.pbf
+            osmium add-locations-to-ways fuel-$c.pbf -f opl,add_metadata=false -o work/fuel-$c.opl
+          done
+      - name: Sestavení souborů pro aplikaci
+        run: python3 scripts/build.py work site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
