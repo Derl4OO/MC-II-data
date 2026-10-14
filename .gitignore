@@ -2,3 +2,5 @@ _to_delete/
 work/
 site/
 *.pbf
+__pycache__/
+*.pyc

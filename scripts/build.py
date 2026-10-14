@@ -9,10 +9,13 @@ Output (site/v1/):
   roads/<x>_<y>.bin  raw-DEFLATE JSON array of roads per tile (0.075° lon × 0.05° lat)
   radars.json        Overpass-like {"elements": [...]} with speed cameras
   fuel.json          Overpass-like {"elements": [...]} with fuel stations (ways as "center")
+  sights.json        {"sights": [[lat, lon, name, kind], ...]} named castles, chateaux, ruins, viewpoints
+                     and mountain passes for "Překvap mě" (extracted here from <cc>.osm.pbf with osmium,
+                     so the workflow file does not need to change)
   meta.json          build time and counts
 Data © OpenStreetMap contributors, ODbL.
 """
-import glob, json, math, os, re, sys, time, zlib
+import glob, json, math, os, re, subprocess, sys, time, zlib
 from collections import defaultdict
 
 TILE_LAT, TILE_LON = 0.05, 0.075
@@ -150,6 +153,46 @@ def build_points(files, out_path, want):
         json.dump({"elements": elements}, f, ensure_ascii=False, separators=(",", ":"))
     return len(elements)
 
+SIGHT_FILTERS = ["nw/historic=castle,ruins", "nw/tourism=viewpoint", "n/mountain_pass=yes"]
+
+def extract_sights(work):
+    """Runs osmium on the downloaded country files (cz.osm.pbf, sk.osm.pbf in the current folder)."""
+    for pbf in sorted(glob.glob("*.osm.pbf")):
+        c = os.path.basename(pbf).split(".")[0]
+        try:
+            subprocess.run(["osmium", "tags-filter", pbf, *SIGHT_FILTERS, "-o", f"sights-{c}.pbf", "--overwrite"], check=True)
+            subprocess.run(["osmium", "add-locations-to-ways", f"sights-{c}.pbf", "-f", "opl,add_metadata=false",
+                            "-o", os.path.join(work, f"sights-{c}.opl"), "--overwrite"], check=True)
+        except (OSError, subprocess.CalledProcessError) as error:
+            print("Zajímavá místa se nepodařilo vybrat:", error)
+
+def sight_kind(tags):
+    if tags.get("historic") == "castle":
+        return "chateau" if tags.get("castle_type") in ("palace", "stately", "manor", "chateau") else "castle"
+    if tags.get("historic") == "ruins":
+        return "ruins"
+    if tags.get("tourism") == "viewpoint":
+        return "viewpoint"
+    if tags.get("mountain_pass") == "yes":
+        return "pass"
+    return None
+
+def build_sights(work, out_path):
+    tmp = out_path + ".tmp.json"
+    build_points(sorted(glob.glob(os.path.join(work, "sights-*.opl"))), tmp,
+                 lambda t: bool(t.get("name")) and sight_kind(t) is not None)
+    with open(tmp, encoding="utf-8") as f:
+        elements = json.load(f)["elements"]
+    os.remove(tmp)
+    sights = []
+    for e in elements:
+        lat = e["lat"] if "lat" in e else e["center"]["lat"]
+        lon = e["lon"] if "lon" in e else e["center"]["lon"]
+        sights.append([round(lat, 5), round(lon, 5), e["tags"]["name"], sight_kind(e["tags"])])
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump({"sights": sights, "license": "© OpenStreetMap contributors, ODbL 1.0"}, f, ensure_ascii=False, separators=(",", ":"))
+    return len(sights)
+
 def main(work, site):
     out = os.path.join(site, "v1")
     os.makedirs(out, exist_ok=True)
@@ -158,8 +201,11 @@ def main(work, site):
                         lambda t: t.get("highway") == "speed_camera")
     fuel = build_points(sorted(glob.glob(os.path.join(work, "fuel-*.opl"))), os.path.join(out, "fuel.json"),
                         lambda t: t.get("amenity") == "fuel")
+    extract_sights(work)
+    # Not critical: without sights "Překvap mě" uses its built-in list, so a failure does not stop the deploy.
+    sights = build_sights(work, os.path.join(out, "sights.json"))
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
-            "speedCameras": cams, "fuelStations": fuel, "license": "© OpenStreetMap contributors, ODbL 1.0"}
+            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "license": "© OpenStreetMap contributors, ODbL 1.0"}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
