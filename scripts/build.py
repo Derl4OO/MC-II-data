@@ -75,6 +75,67 @@ def speed_limit(tags, kind):
         if raw.endswith(":living_street"): return 20
     return {"motorway": 130, "living_street": 20}.get(kind)
 
+# --- Default (implied) limits for roads without a maxspeed tag (Czech/Slovak rules) ---
+# Most rural roads in OSM have no maxspeed; the law gives 90 outside and 50 inside built-up areas.
+# Built-up areas are approximated by OSM landuse polygons (residential, retail, commercial),
+# rasterised into ~100 m cells.
+CELL_LAT, CELL_LON = 0.0009, 0.0013
+URBAN_FILTER = ["w/landuse=residential,retail,commercial"]
+
+def extract_urban(work):
+    for pbf in sorted(glob.glob("*.osm.pbf")):
+        c = os.path.basename(pbf).split(".")[0]
+        try:
+            subprocess.run(["osmium", "tags-filter", pbf, *URBAN_FILTER, "-o", f"urban-{c}.pbf", "--overwrite"], check=True)
+            subprocess.run(["osmium", "add-locations-to-ways", f"urban-{c}.pbf", "-f", "opl,add_metadata=false",
+                            "-o", os.path.join(work, f"urban-{c}.opl"), "--overwrite"], check=True)
+        except (OSError, subprocess.CalledProcessError) as error:
+            print("Zástavbu se nepodařilo vybrat:", error)
+
+def build_urban_cells(work):
+    cells = set()
+    for path in sorted(glob.glob(os.path.join(work, "urban-*.opl"))):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if not line.startswith("w"):
+                    continue
+                _, _, tags, nodes = parse_line(line)
+                pts = [(n[1], n[2]) for n in nodes or [] if n[1] is not None and n[2] is not None]
+                if len(pts) < 4 or pts[0] != pts[-1]:
+                    continue  # only closed areas
+                lons = [p[0] for p in pts]; lats = [p[1] for p in pts]
+                x0, x1 = math.floor(min(lons) / CELL_LON), math.floor(max(lons) / CELL_LON)
+                y0, y1 = math.floor(min(lats) / CELL_LAT), math.floor(max(lats) / CELL_LAT)
+                if (x1 - x0 + 1) * (y1 - y0 + 1) > 40000:
+                    continue  # absurdly large area (mapping error)
+                # Scanline fill: for each cell row, the edge crossings at the row's centre line.
+                edges = list(zip(pts, pts[1:]))
+                for cy in range(y0, y1 + 1):
+                    py = (cy + 0.5) * CELL_LAT
+                    xs = sorted(xi + (py - yi) * (xj - xi) / (yj - yi)
+                                for (xi, yi), (xj, yj) in edges if (yi > py) != (yj > py))
+                    for k in range(0, len(xs) - 1, 2):
+                        for cx in range(math.floor(xs[k] / CELL_LON - 0.5) + 1, math.floor(xs[k + 1] / CELL_LON - 0.5) + 1):
+                            cells.add((cx, cy))
+                # small areas: make sure the polygon's own corners count too
+                for lo, la in pts:
+                    cells.add((math.floor(lo / CELL_LON), math.floor(la / CELL_LAT)))
+    return cells
+
+def is_urban(cells, lon, lat):
+    cx, cy = math.floor(lon / CELL_LON), math.floor(lat / CELL_LAT)
+    return any((cx + dx, cy + dy) in cells for dx in (-1, 0, 1) for dy in (-1, 0, 1))
+
+def implied_limit(tags, kind, urban):
+    base = kind.replace("_link", "")
+    if base == "motorway": return 130
+    if base == "living_street": return 20
+    if base == "residential": return 50
+    if base == "trunk" and tags.get("motorroad") == "yes" and not urban: return 110
+    return 50 if urban else 90
+
+URBAN_CELLS = set()
+
 def oneway(tags, kind):
     v = tags.get("oneway")
     if v in ("yes", "1", "true"): return 1
@@ -112,11 +173,25 @@ def build_roads(files, out_dir):
                     continue
                 lats = [round(n[2], 6) for n in nodes]
                 lons = [round(n[1], 6) for n in nodes]
-                road = json.dumps({"id": wid, "nodes": [n[0] for n in nodes], "lats": lats, "lons": lons,
-                                   "kind": kind, "limit": speed_limit(tags, kind), "oneway": oneway(tags, kind)},
-                                  separators=(",", ":"))
-                for key in tiles_for(lats, lons):
-                    tiles[key][wid] = road
+                limit = speed_limit(tags, kind)
+                if limit is not None or not URBAN_CELLS:
+                    pieces = [(0, len(nodes) - 1, limit)]
+                else:
+                    # No tag: implied limit, split where the road enters or leaves a built-up area
+                    # (pieces share the node, so the road network stays connected).
+                    flags = [is_urban(URBAN_CELLS, lons[i], lats[i]) for i in range(len(nodes))]
+                    pieces, start = [], 0
+                    for i in range(1, len(nodes)):
+                        if i == len(nodes) - 1 or flags[i] != flags[start]:
+                            pieces.append((start, i, implied_limit(tags, kind, flags[start])))
+                            start = i
+                for k, (a, b, piece_limit) in enumerate(pieces):
+                    pid = wid if len(pieces) == 1 else wid * 100 + k
+                    road = json.dumps({"id": pid, "nodes": [n[0] for n in nodes[a:b + 1]], "lats": lats[a:b + 1], "lons": lons[a:b + 1],
+                                       "kind": kind, "limit": piece_limit, "oneway": oneway(tags, kind)},
+                                      separators=(",", ":"))
+                    for key in tiles_for(lats[a:b + 1], lons[a:b + 1]):
+                        tiles[key][pid] = road
                 count += 1
     os.makedirs(os.path.join(out_dir, "roads"), exist_ok=True)
     for (x, y), roads in tiles.items():
@@ -196,6 +271,9 @@ def build_sights(work, out_path):
 def main(work, site):
     out = os.path.join(site, "v1")
     os.makedirs(out, exist_ok=True)
+    extract_urban(work)
+    URBAN_CELLS.update(build_urban_cells(work))
+    print("Zástavba: %d buněk" % len(URBAN_CELLS))
     roads, tiles = build_roads(sorted(glob.glob(os.path.join(work, "roads-*.opl"))), out)
     cams = build_points(sorted(glob.glob(os.path.join(work, "cams-*.opl"))), os.path.join(out, "radars.json"),
                         lambda t: t.get("highway") == "speed_camera")
@@ -205,7 +283,7 @@ def main(work, site):
     # Not critical: without sights "Překvap mě" uses its built-in list, so a failure does not stop the deploy.
     sights = build_sights(work, os.path.join(out, "sights.json"))
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
-            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "license": "© OpenStreetMap contributors, ODbL 1.0"}
+            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "license": "© OpenStreetMap contributors, ODbL 1.0"}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
