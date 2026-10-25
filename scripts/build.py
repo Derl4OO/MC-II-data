@@ -9,8 +9,8 @@ Output (site/v1/):
   roads/<x>_<y>.bin  raw-DEFLATE JSON array of roads per tile (0.075° lon × 0.05° lat)
   radars.json        Overpass-like {"elements": [...]} with speed cameras
   fuel.json          Overpass-like {"elements": [...]} with fuel stations (ways as "center")
-  sights.json        {"sights": [[lat, lon, name, kind], ...]} named castles, chateaux, ruins, viewpoints
-                     and mountain passes for "Překvap mě" (extracted here from <cc>.osm.pbf with osmium,
+  sights.json        {"sights": [[lat, lon, name, kind], ...]} named castles, chateaux, ruins, viewpoints,
+                     mountain passes, waterfalls, peaks, cafés and motorests for "Překvap mě" (extracted here from <cc>.osm.pbf with osmium,
                      so the workflow file does not need to change)
   meta.json          build time and counts
 Data © OpenStreetMap contributors, ODbL.
@@ -62,7 +62,13 @@ def parse_line(line):
     return kind, oid, tags, nodes if kind == "w" else (x, y)
 
 def speed_limit(tags, kind):
-    for key in ("maxspeed", "maxspeed:type", "source:maxspeed"):
+    # Order: the posted limit, then its legal type ("CZ:urban"), then the traffic zone the road lies in
+    # ("zone:traffic=CZ:rural", "zone:maxspeed=CZ:50"). A direction-only limit counts when both sides agree
+    # or only one side is given (the app has no per-direction limits yet).
+    fw, bw = tags.get("maxspeed:forward", ""), tags.get("maxspeed:backward", "")
+    if not tags.get("maxspeed") and (fw or bw) and (not fw or not bw or fw == bw):
+        tags = dict(tags, maxspeed=fw or bw)
+    for key in ("maxspeed", "maxspeed:type", "source:maxspeed", "zone:maxspeed", "zone:traffic"):
         raw = tags.get(key, "").lower()
         if not raw:
             continue
@@ -122,6 +128,79 @@ def build_urban_cells(work):
                     cells.add((math.floor(lo / CELL_LON), math.floor(la / CELL_LAT)))
     return cells
 
+# --- Village / town signs (start and end of a built-up area) ---
+# The legal 50 km/h starts exactly at the sign, so where landuse says the road enters or leaves a built-up
+# area and such a sign stands within 400 m along the road, the change is moved to the sign.
+# CZ: IS 12a/12b, SK: IS 36/IS 37, everywhere also traffic_sign=city_limit.
+SIGN_RE = re.compile(r"city_limit|IS ?12[ab]|IS ?3[67]", re.I)
+CITY_LIMITS = defaultdict(list)  # cell -> [(lon, lat)]
+SIGN_CELL = 0.002
+
+def extract_city_limits(work):
+    for pbf in sorted(glob.glob("*.osm.pbf")):
+        c = os.path.basename(pbf).split(".")[0]
+        try:
+            subprocess.run(["osmium", "tags-filter", pbf, "n/traffic_sign", "-f", "opl,add_metadata=false",
+                            "-o", os.path.join(work, f"signs-{c}.opl"), "--overwrite"], check=True)
+        except (OSError, subprocess.CalledProcessError) as error:
+            print("Značky obcí se nepodařilo vybrat:", error)
+
+def load_city_limits(work):
+    count = 0
+    for path in sorted(glob.glob(os.path.join(work, "signs-*.opl"))):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if not line.startswith("n"):
+                    continue
+                _, _, tags, (x, y) = parse_line(line)
+                if x is None or y is None:
+                    continue
+                values = " ".join(v for k, v in tags.items() if k.startswith("traffic_sign"))
+                if SIGN_RE.search(values):
+                    CITY_LIMITS[(math.floor(x / SIGN_CELL), math.floor(y / SIGN_CELL))].append((x, y))
+                    count += 1
+    return count
+
+def near_city_limit(lon, lat, meters=30):
+    cx, cy = math.floor(lon / SIGN_CELL), math.floor(lat / SIGN_CELL)
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for (x, y) in CITY_LIMITS.get((cx + dx, cy + dy), ()):
+                if distance_m(lon, lat, x, y) <= meters:
+                    return True
+    return False
+
+def distance_m(lon1, lat1, lon2, lat2):
+    dx = (lon2 - lon1) * 111320 * math.cos(math.radians((lat1 + lat2) / 2))
+    dy = (lat2 - lat1) * 110540
+    return math.hypot(dx, dy)
+
+def snap_to_signs(flags, lons, lats, reach=400):
+    """Moves each urban/rural change to a village sign within `reach` metres along the road."""
+    if not CITY_LIMITS:
+        return flags
+    flags = list(flags)
+    n = len(flags)
+    along = [0.0]
+    for i in range(1, n):
+        along.append(along[-1] + distance_m(lons[i - 1], lats[i - 1], lons[i], lats[i]))
+    signs = [i for i in range(n) if near_city_limit(lons[i], lats[i])]
+    if not signs:
+        return flags
+    for i in range(1, n):
+        if flags[i] == flags[i - 1]:
+            continue
+        best = min(signs, key=lambda j: abs(along[j] - along[i]))
+        if abs(along[best] - along[i]) > reach or best == i:
+            continue
+        if best < i:
+            for k in range(best, i):
+                flags[k] = flags[i]
+        else:
+            for k in range(i, best):
+                flags[k] = flags[i - 1]
+    return flags
+
 def is_urban(cells, lon, lat):
     cx, cy = math.floor(lon / CELL_LON), math.floor(lat / CELL_LAT)
     return any((cx + dx, cy + dy) in cells for dx in (-1, 0, 1) for dy in (-1, 0, 1))
@@ -179,7 +258,7 @@ def build_roads(files, out_dir):
                 else:
                     # No tag: implied limit, split where the road enters or leaves a built-up area
                     # (pieces share the node, so the road network stays connected).
-                    flags = [is_urban(URBAN_CELLS, lons[i], lats[i]) for i in range(len(nodes))]
+                    flags = snap_to_signs([is_urban(URBAN_CELLS, lons[i], lats[i]) for i in range(len(nodes))], lons, lats)
                     pieces, start = [], 0
                     for i in range(1, len(nodes)):
                         if i == len(nodes) - 1 or flags[i] != flags[start]:
@@ -228,7 +307,11 @@ def build_points(files, out_path, want):
         json.dump({"elements": elements}, f, ensure_ascii=False, separators=(",", ":"))
     return len(elements)
 
-SIGHT_FILTERS = ["nw/historic=castle,ruins", "nw/tourism=viewpoint", "n/mountain_pass=yes"]
+SIGHT_FILTERS = ["nw/historic=castle,ruins", "nw/tourism=viewpoint", "n/mountain_pass=yes",
+                 "n/natural=waterfall,peak", "nw/amenity=cafe,restaurant"]
+
+# Restaurants only when the name says it is a roadside stop for riders/drivers (motorest, motel, bikers).
+MOTOREST_RE = re.compile(r"motorest|motel|biker|motork[aá]ř|moto ?caf|moto ?bar", re.I)
 
 def extract_sights(work):
     """Runs osmium on the downloaded country files (cz.osm.pbf, sk.osm.pbf in the current folder)."""
@@ -250,6 +333,14 @@ def sight_kind(tags):
         return "viewpoint"
     if tags.get("mountain_pass") == "yes":
         return "pass"
+    if tags.get("natural") == "waterfall":
+        return "waterfall"
+    if tags.get("natural") == "peak" and tags.get("ele"):
+        return "peak"
+    if tags.get("amenity") == "cafe":
+        return "cafe"
+    if tags.get("amenity") == "restaurant" and MOTOREST_RE.search(tags.get("name", "")):
+        return "motorest"
     return None
 
 def build_sights(work, out_path):
@@ -274,6 +365,9 @@ def main(work, site):
     extract_urban(work)
     URBAN_CELLS.update(build_urban_cells(work))
     print("Zástavba: %d buněk" % len(URBAN_CELLS))
+    extract_city_limits(work)
+    signs = load_city_limits(work)
+    print("Značky obcí: %d" % signs)
     roads, tiles = build_roads(sorted(glob.glob(os.path.join(work, "roads-*.opl"))), out)
     cams = build_points(sorted(glob.glob(os.path.join(work, "cams-*.opl"))), os.path.join(out, "radars.json"),
                         lambda t: t.get("highway") == "speed_camera")
@@ -283,7 +377,7 @@ def main(work, site):
     # Not critical: without sights "Překvap mě" uses its built-in list, so a failure does not stop the deploy.
     sights = build_sights(work, os.path.join(out, "sights.json"))
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
-            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "license": "© OpenStreetMap contributors, ODbL 1.0"}
+            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "license": "© OpenStreetMap contributors, ODbL 1.0"}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
