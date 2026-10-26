@@ -15,7 +15,7 @@ Output (site/v1/):
   meta.json          build time and counts
 Data © OpenStreetMap contributors, ODbL.
 """
-import glob, json, math, os, re, subprocess, sys, time, zlib
+import glob, json, math, os, re, subprocess, sys, time, unicodedata, zlib
 from collections import defaultdict
 
 TILE_LAT, TILE_LON = 0.05, 0.075
@@ -359,6 +359,83 @@ def build_sights(work, out_path):
         json.dump({"sights": sights, "license": "© OpenStreetMap contributors, ODbL 1.0"}, f, ensure_ascii=False, separators=(",", ":"))
     return len(sights)
 
+# --- Catalogue of places for search (IKEA, Lidl, cafés, motorcycle services…), free and identical on iOS/Android ---
+POI_FILTERS = ["nw/shop", "nw/amenity=cafe,restaurant,fast_food,pub,bar,fuel,motorcycle_parking,parking,pharmacy,hospital",
+               "nw/tourism=hotel,motel,guest_house,hostel,camp_site,museum,attraction,viewpoint", "nw/historic=castle,ruins"]
+
+def extract_pois(work):
+    for pbf in sorted(glob.glob("*.osm.pbf")):
+        c = os.path.basename(pbf).split(".")[0]
+        try:
+            subprocess.run(["osmium", "tags-filter", pbf, *POI_FILTERS, "-o", f"pois-{c}.pbf", "--overwrite"], check=True)
+            subprocess.run(["osmium", "add-locations-to-ways", f"pois-{c}.pbf", "-f", "opl,add_metadata=false",
+                            "-o", os.path.join(work, f"pois-{c}.opl"), "--overwrite"], check=True)
+        except (OSError, subprocess.CalledProcessError) as error:
+            print("Katalog míst se nepodařilo vybrat:", error)
+
+def poi_kind(tags):
+    shop, amenity, tourism, historic = tags.get("shop"), tags.get("amenity"), tags.get("tourism"), tags.get("historic")
+    if shop in ("motorcycle", "motorcycle_repair") or tags.get("service:vehicle:motorcycle") == "yes": return "moto"
+    if shop in ("mall", "department_store"): return "mall"
+    if shop in ("supermarket", "convenience"): return "supermarket"
+    if shop: return "shop"
+    if amenity == "cafe": return "cafe"
+    if amenity == "restaurant": return "motorest" if MOTOREST_RE.search(tags.get("name", "")) else "restaurant"
+    if amenity == "fast_food": return "fast_food"
+    if amenity in ("pub", "bar"): return "pub"
+    if amenity == "fuel": return "fuel"
+    if amenity == "motorcycle_parking": return "parking_moto"
+    if amenity == "parking": return "parking"
+    if amenity == "pharmacy": return "pharmacy"
+    if amenity == "hospital": return "hospital"
+    if tourism in ("hotel", "motel", "guest_house", "hostel"): return "hotel"
+    if tourism == "camp_site": return "camp"
+    if tourism in ("museum", "attraction"): return "attraction"
+    if tourism == "viewpoint": return "viewpoint"
+    if historic in ("castle", "ruins"): return "castle"
+    return None
+
+def normalize(text):
+    plain = "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)).lower()
+    return re.sub(r"[^a-z0-9]+", " ", plain).strip()
+
+def write_bin(path, rows):
+    payload = json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    compressor = zlib.compressobj(9, zlib.DEFLATED, -15)  # raw DEFLATE, same as road tiles
+    with open(path, "wb") as f:
+        f.write(compressor.compress(payload) + compressor.flush())
+
+def build_pois(work, out_dir):
+    """pois/n/<2 letters>.bin: places whose name has a word starting with those letters (name search);
+    pois/t/<x>_<y>.bin: places in a road tile ("near me" chips). Row = [lat, lon, name, kind, town]."""
+    tmp = os.path.join(out_dir, "pois.tmp.json")
+    build_points(sorted(glob.glob(os.path.join(work, "pois-*.opl"))), tmp,
+                 lambda t: poi_kind(t) is not None and (bool(t.get("name")) or t.get("amenity") == "motorcycle_parking")
+                 and not (t.get("amenity") == "parking" and not t.get("name")))
+    with open(tmp, encoding="utf-8") as f:
+        elements = json.load(f)["elements"]
+    os.remove(tmp)
+    by_name, by_tile, count = defaultdict(list), defaultdict(list), 0
+    for e in elements:
+        lat = e["lat"] if "lat" in e else e["center"]["lat"]
+        lon = e["lon"] if "lon" in e else e["center"]["lon"]
+        tags = e["tags"]
+        name = tags.get("name") or tags.get("brand") or "Parkování motorek"
+        kind = poi_kind(tags)
+        row = [round(lat, 5), round(lon, 5), name, kind, tags.get("addr:city") or tags.get("addr:place") or ""]
+        keys = {w[:2] for w in normalize(name + " " + tags.get("brand", "")).split()[:5] if len(w) >= 2}
+        for key in keys:
+            by_name[key].append(row)
+        by_tile[(math.floor(lon / TILE_LON), math.floor(lat / TILE_LAT))].append(row)
+        count += 1
+    os.makedirs(os.path.join(out_dir, "pois", "n"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "pois", "t"), exist_ok=True)
+    for key, rows in by_name.items():
+        write_bin(os.path.join(out_dir, "pois", "n", f"{key}.bin"), rows)
+    for (x, y), rows in by_tile.items():
+        write_bin(os.path.join(out_dir, "pois", "t", f"{x}_{y}.bin"), rows)
+    return count
+
 def main(work, site):
     out = os.path.join(site, "v1")
     os.makedirs(out, exist_ok=True)
@@ -376,8 +453,16 @@ def main(work, site):
     extract_sights(work)
     # Not critical: without sights "Překvap mě" uses its built-in list, so a failure does not stop the deploy.
     sights = build_sights(work, os.path.join(out, "sights.json"))
+    # Not critical either: without the catalogue the app searches addresses and Mapbox as before.
+    try:
+        extract_pois(work)
+        pois = build_pois(work, out)
+    except Exception as error:
+        print("Katalog míst selhal:", error)
+        pois = 0
+    print("Katalog míst: %d" % pois)
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
-            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "license": "© OpenStreetMap contributors, ODbL 1.0"}
+            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "pois": pois, "license": "© OpenStreetMap contributors, ODbL 1.0"}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
