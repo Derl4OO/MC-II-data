@@ -361,7 +361,9 @@ def build_sights(work, out_path):
 
 # --- Catalogue of places for search (IKEA, Lidl, cafés, motorcycle services…), free and identical on iOS/Android ---
 POI_FILTERS = ["nw/shop", "nw/amenity=cafe,restaurant,fast_food,pub,bar,fuel,motorcycle_parking,parking,pharmacy,hospital",
-               "nw/tourism=hotel,motel,guest_house,hostel,camp_site,museum,attraction,viewpoint", "nw/historic=castle,ruins"]
+               "nw/tourism=hotel,motel,guest_house,hostel,camp_site,museum,attraction,viewpoint", "nw/historic=castle,ruins",
+               # Obce a města: hledání cíle bez Mapboxu (okamžitě a i bez signálu).
+               "n/place=city,town,village,hamlet,suburb"]
 
 def extract_pois(work):
     for pbf in sorted(glob.glob("*.osm.pbf")):
@@ -375,6 +377,9 @@ def extract_pois(work):
 
 def poi_kind(tags):
     shop, amenity, tourism, historic = tags.get("shop"), tags.get("amenity"), tags.get("tourism"), tags.get("historic")
+    place = tags.get("place")
+    if place in ("city", "town"): return "city"
+    if place in ("village", "hamlet", "suburb"): return "village"
     if shop in ("motorcycle", "motorcycle_repair") or tags.get("service:vehicle:motorcycle") == "yes": return "moto"
     if shop in ("mall", "department_store"): return "mall"
     if shop in ("supermarket", "convenience"): return "supermarket"
