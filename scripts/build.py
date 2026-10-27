@@ -214,6 +214,8 @@ def implied_limit(tags, kind, urban):
     return 50 if urban else 90
 
 URBAN_CELLS = set()
+# Quality check written to meta.json: road pieces with a posted limit, with a default limit, and without any.
+LIMIT_STATS = {"signed": 0, "implied": 0, "none": 0}
 
 def oneway(tags, kind):
     v = tags.get("oneway")
@@ -253,6 +255,8 @@ def build_roads(files, out_dir):
                 lats = [round(n[2], 6) for n in nodes]
                 lons = [round(n[1], 6) for n in nodes]
                 limit = speed_limit(tags, kind)
+                # "signed": the limit is posted in OSM (sign, zone), not just the road-class default.
+                signed = speed_limit(tags, "") is not None
                 if limit is not None or not URBAN_CELLS:
                     pieces = [(0, len(nodes) - 1, limit)]
                 else:
@@ -266,9 +270,12 @@ def build_roads(files, out_dir):
                             start = i
                 for k, (a, b, piece_limit) in enumerate(pieces):
                     pid = wid if len(pieces) == 1 else wid * 100 + k
-                    road = json.dumps({"id": pid, "nodes": [n[0] for n in nodes[a:b + 1]], "lats": lats[a:b + 1], "lons": lons[a:b + 1],
-                                       "kind": kind, "limit": piece_limit, "oneway": oneway(tags, kind)},
-                                      separators=(",", ":"))
+                    piece = {"id": pid, "nodes": [n[0] for n in nodes[a:b + 1]], "lats": lats[a:b + 1], "lons": lons[a:b + 1],
+                             "kind": kind, "limit": piece_limit, "oneway": oneway(tags, kind)}
+                    if signed:
+                        piece["signed"] = True  # JSON true (Swift Bool decodes only true/false)
+                    LIMIT_STATS["none" if piece_limit is None else "signed" if signed else "implied"] += 1
+                    road = json.dumps(piece, separators=(",", ":"))
                     for key in tiles_for(lats[a:b + 1], lons[a:b + 1]):
                         tiles[key][pid] = road
                 count += 1
@@ -451,6 +458,9 @@ def main(work, site):
     signs = load_city_limits(work)
     print("Značky obcí: %d" % signs)
     roads, tiles = build_roads(sorted(glob.glob(os.path.join(work, "roads-*.opl"))), out)
+    print("Limity: %s" % LIMIT_STATS)
+    if LIMIT_STATS["none"] > 0.05 * max(1, sum(LIMIT_STATS.values())):
+        print("::warning::Víc než 5 % úseků silnic nemá limit – zkontroluj zástavbu (urbanCells) a značky obcí.")
     cams = build_points(sorted(glob.glob(os.path.join(work, "cams-*.opl"))), os.path.join(out, "radars.json"),
                         lambda t: t.get("highway") == "speed_camera")
     fuel = build_points(sorted(glob.glob(os.path.join(work, "fuel-*.opl"))), os.path.join(out, "fuel.json"),
@@ -467,7 +477,8 @@ def main(work, site):
         pois = 0
     print("Katalog míst: %d" % pois)
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
-            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "pois": pois, "license": "© OpenStreetMap contributors, ODbL 1.0"}
+            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "pois": pois,
+            "limits": dict(LIMIT_STATS, noneShare=round(LIMIT_STATS["none"] / max(1, sum(LIMIT_STATS.values())), 4)), "license": "© OpenStreetMap contributors, ODbL 1.0"}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
