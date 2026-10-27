@@ -476,9 +476,17 @@ def main(work, site):
         print("Katalog míst selhal:", error)
         pois = 0
     print("Katalog míst: %d" % pois)
+    # Adresy ČR z RÚIAN (ČÚZK, CC BY 4.0): smí se ukládat do oblíbených, fungují bez signálu. Není kritické.
+    addresses, address_files = 0, 0
+    try:
+        import ruian
+        addresses, address_files, address_source = ruian.build_addresses(work, out)
+        print("Adresy RÚIAN: %d bodů, %d souborů (%s)" % (addresses, address_files, address_source))
+    except Exception as error:
+        print("::warning::Adresy RÚIAN selhaly:", error)
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
-            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "pois": pois,
-            "limits": dict(LIMIT_STATS, noneShare=round(LIMIT_STATS["none"] / max(1, sum(LIMIT_STATS.values())), 4)), "license": "© OpenStreetMap contributors, ODbL 1.0"}
+            "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "pois": pois, "addresses": addresses, "addressFiles": address_files,
+            "limits": dict(LIMIT_STATS, noneShare=round(LIMIT_STATS["none"] / max(1, sum(LIMIT_STATS.values())), 4)), "license": "© OpenStreetMap contributors, ODbL 1.0", "addressLicense": "RÚIAN © ČÚZK, CC BY 4.0"}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:

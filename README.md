@@ -5,6 +5,7 @@ Data pro aplikaci **MotoCesta** (ČR + SK), sestavovaná automaticky jednou měs
 - `v1/roads/<x>_<y>.bin` – silnice po dlaždicích 0,075° × 0,05° (rychlostní limity, jednosměrky, tvar silnice) pro volnou jízdu,
 - `v1/radars.json` – pevné radary,
 - `v1/fuel.json` – čerpací stanice,
+- `v1/addr/<3 písmena>.bin` – adresy ČR z RÚIAN (ulice a čísla domů) pro hledání cíle; ukládat do oblíbených smí,
 - `v1/meta.json` – datum sestavení a počty.
 
 Soubory jsou na GitHub Pages: https://derl4oo.github.io/MC-II-data/v1/ – aplikace je stahuje odtud a veřejný Overpass používá jen jako zálohu.
@@ -13,3 +14,5 @@ Sestavení: `.github/workflows/data.yml` (osmium-tool + `scripts/build.py`, jen 
 
 ## Licence dat
 © přispěvatelé OpenStreetMap. Data jsou dostupná pod licencí [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/); odvozená databáze v tomto repozitáři je zveřejněná pod stejnou licencí. https://www.openstreetmap.org/copyright
+
+Adresy: zdroj RÚIAN, © Český úřad zeměměřický a katastrální (ČÚZK), licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Souřadnice převedené z S-JTSK do WGS 84 (`scripts/ruian.py`).
