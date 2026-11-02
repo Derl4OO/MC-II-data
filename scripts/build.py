@@ -484,6 +484,18 @@ def main(work, site):
         print("Adresy RÚIAN: %d bodů, %d souborů (%s)" % (addresses, address_files, address_source))
     except Exception as error:
         print("::warning::Adresy RÚIAN selhaly:", error)
+    # Přepínač poskytovatele tras pro aplikace (config/app.json → v1/config.json), viz RoutingConfig v aplikacích.
+    try:
+        import shutil
+        shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "app.json"), os.path.join(out, "config.json"))
+    except Exception as error:
+        print("::warning::config.json chybí:", error)
+    # Uzavírky z oficiálních zdrojů (zatím Německo). Měsíčně jen na zkoušku, ostrý provoz poběží častěji na serveru.
+    try:
+        import closures
+        closures.main(out)
+    except Exception as error:
+        print("::warning::Uzavírky selhaly:", error)
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
             "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "pois": pois, "addresses": addresses, "addressFiles": address_files,
             "limits": dict(LIMIT_STATS, noneShare=round(LIMIT_STATS["none"] / max(1, sum(LIMIT_STATS.values())), 4)), "license": "© OpenStreetMap contributors, ODbL 1.0", "addressLicense": "RÚIAN © ČÚZK, CC BY 4.0"}

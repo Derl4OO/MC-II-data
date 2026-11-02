@@ -1,0 +1,7 @@
+{
+  "routing": {
+    "provider": "mapbox",
+    "url": "",
+    "key": ""
+  }
+}
