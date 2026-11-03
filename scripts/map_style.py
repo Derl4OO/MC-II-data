@@ -11,10 +11,13 @@ Writes v1/style/day.json and v1/style/night.json. Only the standard library is u
 """
 import json
 import os
+import shutil
 import sys
 
 TILES = "https://tiles.openfreemap.org/planet"
 GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf"
+# Our own icons (road number shields, fuel, café), drawn by Claude: style-assets/sprite*.png/json.
+SPRITE = "https://derl4oo.github.io/MC-II-data/v1/style/sprite"
 ATTRIBUTION = "© OpenMapTiles © přispěvatelé OpenStreetMap"
 REGULAR, BOLD = ["Noto Sans Regular"], ["Noto Sans Bold"]
 
@@ -28,6 +31,7 @@ PALETTES = {
         "rail": "#b9b4ac", "boundary": "#9b8fb0",
         "label": "#2a241c", "label_soft": "#5a5247", "halo": "#f6f1e7", "water_label": "#3d6f9e", "peak": "#7a5b3a",
         "poi": "#e8590c", "poi_stroke": "#ffffff",
+        "protected": "#6f9a5a", "tunnel": "#d9d2c6", "outline": "#d3c8b6", "wetland": "#dbe8d8",
     },
     "night": {
         "background": "#1b1e24", "wood": "#1f2a22", "grass": "#212a22", "residential": "#22262d",
@@ -38,6 +42,7 @@ PALETTES = {
         "rail": "#4a4e57", "boundary": "#7a6f92",
         "label": "#f1f2f4", "label_soft": "#b9bcc4", "halo": "#1b1e24", "water_label": "#7fa6cf", "peak": "#c9a27a",
         "poi": "#f06a1f", "poi_stroke": "#1b1e24",
+        "protected": "#5f8a52", "tunnel": "#3a3e47", "outline": "#30343c", "wetland": "#1e2826",
     },
 }
 
@@ -166,9 +171,69 @@ def _build(name, p):
                     "text-size": width([(4, 13), (8, 20), (12, 28)]), "text-max-width": 8},
          "paint": {"text-color": p["label"], "text-halo-color": p["halo"], "text-halo-width": 2.5}},
     ]
-    return {"version": 8, "name": f"MotoCesta {name}", "glyphs": GLYPHS,
-            "sources": {"omt": {"type": "vector", "url": TILES, "attribution": ATTRIBUTION}},
-            "layers": layers}
+    if p.get("extras", True):
+        tune(layers, p, major_w, minor_w, name)
+    style = {"version": 8, "name": f"MotoCesta {name}", "glyphs": GLYPHS,
+             "sources": {"omt": {"type": "vector", "url": TILES, "attribution": ATTRIBUTION}},
+             "layers": layers}
+    if p.get("extras", True):
+        style["sprite"] = SPRITE
+    return style
+
+
+def tune(layers, p, major_w, minor_w, name):
+    """Finer details (Julien, 3. 11.: "lze vzhled ještě vytunit?"): tunnels, wetlands, building outlines,
+    protected areas (CHKO, national parks) with names, mountain passes, bigger towns win label space."""
+    def after(layer_id, *new):
+        index = next(i for i, layer in enumerate(layers) if layer["id"] == layer_id) + 1
+        layers[index:index] = list(new)
+
+    after("farmland",
+          {"id": "wetland", "type": "fill", "source": "omt", "source-layer": "landcover", "minzoom": 10,
+           "filter": ["==", ["get", "class"], "wetland"], "paint": {"fill-color": p["wetland"]}})
+    after("grass",
+          {"id": "protected-line", "type": "line", "source": "omt", "source-layer": "park", "minzoom": 8,
+           "filter": ["in", ["get", "class"], ["literal", ["national_park", "protected_area", "nature_reserve"]]],
+           "paint": {"line-color": p["protected"], "line-opacity": 0.55, "line-width": width([(8, 1), (13, 2.5)]),
+                     "line-dasharray": [4, 2]}})
+    for layer in layers:
+        if layer["id"] == "building":
+            layer["paint"]["fill-outline-color"] = p["outline"]
+    # Tunnels: the same roads, faded and dashed, under everything else.
+    after("rail",
+          {"id": "tunnel", "type": "line", "source": "omt", "source-layer": "transportation", "minzoom": 11,
+           "filter": ["all", ["==", ["get", "brunnel"], "tunnel"],
+                      ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"]]]],
+           "layout": {"line-join": "round"},
+           "paint": {"line-color": p["tunnel"], "line-width": major_w, "line-dasharray": [1, 0.6]}})
+    after("peak",
+          {"id": "pass", "type": "symbol", "source": "omt", "source-layer": "mountain_peak", "minzoom": 10,
+           "filter": ["all", ["==", ["get", "class"], "saddle"], ["has", "name"]],
+           "layout": {"text-field": ["concat", ["coalesce", ["get", "name:cs"], ["get", "name"]],
+                                     ["case", ["has", "ele"], ["concat", "\n", ["to-string", ["get", "ele"]], " m"], ""]],
+                      "text-font": BOLD, "text-size": 13, "text-max-width": 8},
+           "paint": {"text-color": p["peak"], "text-halo-color": p["halo"], "text-halo-width": 2}},
+          {"id": "protected-name", "type": "symbol", "source": "omt", "source-layer": "park", "minzoom": 9, "maxzoom": 13,
+           "filter": ["all", ["has", "name"], ["in", ["get", "class"], ["literal", ["national_park", "protected_area"]]]],
+           "layout": {"text-field": ["coalesce", ["get", "name:cs"], ["get", "name"]], "text-font": ["Noto Sans Italic"],
+                      "text-size": 13, "text-max-width": 9},
+           "paint": {"text-color": p["protected"], "text-halo-color": p["halo"], "text-halo-width": 1.5}})
+    # Road numbers in shields (main roads yellow, others white) and icons for fuel and cafés.
+    for layer in layers:
+        if layer["id"] == "road-ref":
+            layer["layout"].update({
+                "icon-image": ["case", ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary"]]],
+                               f"shield-main-{name}", f"shield-{name}"],
+                "icon-text-fit": "both", "icon-text-fit-padding": [1, 3, 1, 3], "icon-rotation-alignment": "viewport",
+                "text-size": 11, "symbol-spacing": 500})
+            layer["paint"] = {"text-color": p["label"]}
+        if layer["id"] == "poi-rider":
+            layer.update({"type": "symbol", "layout": {
+                "icon-image": ["concat", ["get", "class"], f"-{name}"], "icon-size": width([(13, 0.75), (17, 1.1)]),
+                "icon-allow-overlap": True}, "paint": {}})
+    for layer in layers:
+        if layer["id"].startswith("place-"):
+            layer["layout"]["symbol-sort-key"] = ["coalesce", ["get", "rank"], 99]
 
 
 def main(out):
@@ -177,6 +242,9 @@ def main(out):
     for name in PALETTES:
         with open(os.path.join(folder, f"{name}.json"), "w", encoding="utf-8") as f:
             json.dump(build(name), f, ensure_ascii=False, separators=(",", ":"))
+    assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "style-assets")
+    for file in ("sprite.png", "sprite.json", "sprite@2x.png", "sprite@2x.json"):
+        shutil.copy(os.path.join(assets, file), os.path.join(folder, file))
     return list(PALETTES)
 
 
