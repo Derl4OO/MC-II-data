@@ -61,6 +61,26 @@ def read_json(path, default):
         return default
 
 
+def report_problems(stats, countries, size):
+    """problems.md in the current folder when something needs a look; the workflow then opens a GitHub issue
+    (GitHub e-mails the repository owner). Julien 3. 11.: a drop in the data must reach us."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    wanted = [c["id"] for c in read_json(os.path.join(here, "..", "config", "countries.json"), {"countries": []})["countries"]]
+    lines = []
+    for cc in wanted:
+        if cc not in countries:
+            lines.append(f"- **{cc}**: sestavení země selhalo a minulá verze nebyla – země v datech chybí.")
+        elif stats.get(cc, {}).get("kept"):
+            lines.append(f"- **{cc}**: data vypadala špatně ({'; '.join(stats[cc].get('problems', []))}), zůstává minulá verze.")
+    if size > 900e6:
+        lines.append(f"- Data mají {round(size / 1e6)} MB, limit GitHub Pages je 1 GB – přejít na Cloudflare R2.")
+    if lines:
+        with open("problems.md", "w", encoding="utf-8") as f:
+            f.write("Kontrola dat MotoCesty našla problém (" + time.strftime("%d. %m. %Y") + "):\n\n" + "\n".join(lines)
+                    + "\n\nPodrobnosti jsou v logu workflow a ve v1/meta.json. Napiš to Claudovi, opraví to.\n")
+        print("::warning::" + " | ".join(lines))
+
+
 def main(parts, work, site):
     out = os.path.join(site, "v1")
     os.makedirs(out, exist_ok=True)
@@ -161,6 +181,7 @@ def main(parts, work, site):
                 "<p>Data © <a href='https://www.openstreetmap.org/copyright'>přispěvatelé OpenStreetMap</a>, ODbL.</p>"
                 f"<pre>{json.dumps(meta, indent=1, ensure_ascii=False)}</pre>")
     print(json.dumps(meta, indent=1, ensure_ascii=False))
+    report_problems(stats, countries, size)
     if size > 900e6:
         print("::warning::Data mají %d MB – blíží se limit GitHub Pages (1 GB). Je čas přejít na Cloudflare R2." % (size / 1e6))
     if meta["roads"] == 0 or meta["speedCameras"] == 0 or meta["fuelStations"] == 0:

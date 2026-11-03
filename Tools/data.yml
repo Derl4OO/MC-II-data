@@ -11,6 +11,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: pages
@@ -84,6 +85,12 @@ jobs:
         run: cd parts && for d in part-*; do mv "$d" "${d#part-}"; done && ls
       - name: Spojení a sestavení webu
         run: python3 scripts/merge.py parts work site
+      - name: Upozornění na problém (GitHub issue → e-mail)
+        if: ${{ hashFiles('problems.md') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Data MotoCesta – kontrola našla problém" --body-file problems.md
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
