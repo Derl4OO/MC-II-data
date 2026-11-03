@@ -1,28 +1,351 @@
 [
-  {"name": "Olomouc, Hněvotínská → Šternberk", "from": [49.5818, 17.2297], "to": [49.7302, 17.2992]},
-  {"name": "Olomouc, Hněvotínská → Nasobůrky", "from": [49.5818, 17.2297], "to": [49.6943, 17.1357]},
-  {"name": "Olomouc → Brno", "from": [49.5938, 17.2509], "to": [49.1951, 16.6068]},
-  {"name": "Olomouc → Ostrava", "from": [49.5938, 17.2509], "to": [49.8209, 18.2625]},
-  {"name": "Šternberk → Jeseník (přes Ovčárnu)", "from": [49.7302, 17.2992], "to": [50.2294, 17.2046]},
-  {"name": "Jeseník → Červenohorské sedlo", "from": [50.2294, 17.2046], "to": [50.1166, 17.1550]},
-  {"name": "Praha → Brno", "from": [50.0755, 14.4378], "to": [49.1951, 16.6068]},
-  {"name": "Praha → Český Krumlov", "from": [50.0755, 14.4378], "to": [48.8127, 14.3175]},
-  {"name": "Brno → Mikulov", "from": [49.1951, 16.6068], "to": [48.8056, 16.6378]},
-  {"name": "Ostrava → Rožnov pod Radhoštěm", "from": [49.8209, 18.2625], "to": [49.4585, 18.1430]},
-  {"name": "Frýdek-Místek → Bílá (Beskydy)", "from": [49.6880, 18.3536], "to": [49.4430, 18.4570]},
-  {"name": "Zlín → Vsetín", "from": [49.2265, 17.6707], "to": [49.3387, 17.9962]},
-  {"name": "Liberec → Harrachov", "from": [50.7663, 15.0543], "to": [50.7722, 15.4280]},
-  {"name": "Hradec Králové → Pec pod Sněžkou", "from": [50.2092, 15.8328], "to": [50.6917, 15.7330]},
-  {"name": "Karlovy Vary → Boží Dar", "from": [50.2310, 12.8710], "to": [50.4096, 12.9246]},
-  {"name": "Plzeň → Železná Ruda", "from": [49.7384, 13.3736], "to": [49.1376, 13.2353]},
-  {"name": "České Budějovice → Lipno nad Vltavou", "from": [48.9745, 14.4743], "to": [48.6400, 14.2230]},
-  {"name": "Jihlava → Telč", "from": [49.3961, 15.5912], "to": [49.1842, 15.4528]},
-  {"name": "Bratislava → Piešťany", "from": [48.1486, 17.1077], "to": [48.5918, 17.8274]},
-  {"name": "Trenčín → Čičmany", "from": [48.8945, 18.0444], "to": [48.9550, 18.5166]},
-  {"name": "Žilina → Terchová", "from": [49.2231, 18.7394], "to": [49.2595, 19.0298]},
-  {"name": "Banská Bystrica → Donovaly", "from": [48.7363, 19.1462], "to": [48.8809, 19.2236]},
-  {"name": "Poprad → Štrbské Pleso", "from": [49.0590, 20.2970], "to": [49.1194, 20.0632]},
-  {"name": "Košice → Rožňava", "from": [48.7164, 21.2611], "to": [48.6608, 20.5310]},
-  {"name": "Ostrava → Žilina (přes hranici)", "from": [49.8209, 18.2625], "to": [49.2231, 18.7394]},
-  {"name": "Brno → Bratislava", "from": [49.1951, 16.6068], "to": [48.1486, 17.1077]}
+ {
+  "name": "Olomouc, Hněvotínská → Šternberk",
+  "from": [
+   49.5818,
+   17.2297
+  ],
+  "to": [
+   49.7302,
+   17.2992
+  ],
+  "to_place": "Šternberk"
+ },
+ {
+  "name": "Olomouc, Hněvotínská → Nasobůrky",
+  "from": [
+   49.5818,
+   17.2297
+  ],
+  "to": [
+   49.6943,
+   17.1357
+  ],
+  "to_place": "Nasobůrky"
+ },
+ {
+  "name": "Olomouc → Brno",
+  "from": [
+   49.5938,
+   17.2509
+  ],
+  "to": [
+   49.1951,
+   16.6068
+  ]
+ },
+ {
+  "name": "Olomouc → Ostrava",
+  "from": [
+   49.5938,
+   17.2509
+  ],
+  "to": [
+   49.8209,
+   18.2625
+  ]
+ },
+ {
+  "name": "Šternberk → Jeseník",
+  "from": [
+   49.7302,
+   17.2992
+  ],
+  "to": [
+   50.2294,
+   17.2046
+  ],
+  "to_place": "Jeseník"
+ },
+ {
+  "name": "Jeseník → Červenohorské sedlo",
+  "from": [
+   50.2294,
+   17.2046
+  ],
+  "to": [
+   50.1166,
+   17.155
+  ]
+ },
+ {
+  "name": "Praha → Brno",
+  "from": [
+   50.0755,
+   14.4378
+  ],
+  "to": [
+   49.1951,
+   16.6068
+  ]
+ },
+ {
+  "name": "Praha → Český Krumlov",
+  "from": [
+   50.0755,
+   14.4378
+  ],
+  "to": [
+   48.8127,
+   14.3175
+  ]
+ },
+ {
+  "name": "Brno → Mikulov",
+  "from": [
+   49.1951,
+   16.6068
+  ],
+  "to": [
+   48.8056,
+   16.6378
+  ],
+  "to_place": "Mikulov"
+ },
+ {
+  "name": "Ostrava → Rožnov pod Radhoštěm",
+  "from": [
+   49.8209,
+   18.2625
+  ],
+  "to": [
+   49.4585,
+   18.143
+  ],
+  "to_place": "Rožnov pod Radhoštěm"
+ },
+ {
+  "name": "Frýdek-Místek → Bílá (Beskydy)",
+  "from": [
+   49.688,
+   18.3536
+  ],
+  "to": [
+   49.443,
+   18.457
+  ],
+  "to_place": "Bílá"
+ },
+ {
+  "name": "Zlín → Vsetín",
+  "from": [
+   49.2265,
+   17.6707
+  ],
+  "to": [
+   49.3387,
+   17.9962
+  ]
+ },
+ {
+  "name": "Liberec → Harrachov",
+  "from": [
+   50.7663,
+   15.0543
+  ],
+  "to": [
+   50.7722,
+   15.428
+  ],
+  "to_place": "Harrachov"
+ },
+ {
+  "name": "Hradec Králové → Pec pod Sněžkou",
+  "from": [
+   50.2092,
+   15.8328
+  ],
+  "to": [
+   50.6917,
+   15.733
+  ],
+  "to_place": "Pec pod Sněžkou"
+ },
+ {
+  "name": "Karlovy Vary → Boží Dar",
+  "from": [
+   50.231,
+   12.871
+  ],
+  "to": [
+   50.4096,
+   12.9246
+  ],
+  "to_place": "Boží Dar"
+ },
+ {
+  "name": "Plzeň → Železná Ruda",
+  "from": [
+   49.7384,
+   13.3736
+  ],
+  "to": [
+   49.1376,
+   13.2353
+  ],
+  "to_place": "Železná Ruda"
+ },
+ {
+  "name": "České Budějovice → Lipno nad Vltavou",
+  "from": [
+   48.9745,
+   14.4743
+  ],
+  "to": [
+   48.64,
+   14.223
+  ],
+  "to_place": "Lipno nad Vltavou"
+ },
+ {
+  "name": "Jihlava → Telč",
+  "from": [
+   49.3961,
+   15.5912
+  ],
+  "to": [
+   49.1842,
+   15.4528
+  ],
+  "to_place": "Telč"
+ },
+ {
+  "name": "Bratislava → Piešťany",
+  "from": [
+   48.1486,
+   17.1077
+  ],
+  "to": [
+   48.5918,
+   17.8274
+  ]
+ },
+ {
+  "name": "Trenčín → Čičmany",
+  "from": [
+   48.8945,
+   18.0444
+  ],
+  "to": [
+   48.955,
+   18.5166
+  ],
+  "to_place": "Čičmany"
+ },
+ {
+  "name": "Žilina → Terchová",
+  "from": [
+   49.2231,
+   18.7394
+  ],
+  "to": [
+   49.2595,
+   19.0298
+  ],
+  "to_place": "Terchová"
+ },
+ {
+  "name": "Banská Bystrica → Donovaly",
+  "from": [
+   48.7363,
+   19.1462
+  ],
+  "to": [
+   48.8809,
+   19.2236
+  ],
+  "to_place": "Donovaly"
+ },
+ {
+  "name": "Poprad → Štrbské Pleso",
+  "from": [
+   49.059,
+   20.297
+  ],
+  "to": [
+   49.1194,
+   20.0632
+  ]
+ },
+ {
+  "name": "Košice → Rožňava",
+  "from": [
+   48.7164,
+   21.2611
+  ],
+  "to": [
+   48.6608,
+   20.531
+  ]
+ },
+ {
+  "name": "Ostrava → Žilina (přes hranici)",
+  "from": [
+   49.8209,
+   18.2625
+  ],
+  "to": [
+   49.2231,
+   18.7394
+  ]
+ },
+ {
+  "name": "Brno → Bratislava",
+  "from": [
+   49.1951,
+   16.6068
+  ],
+  "to": [
+   48.1486,
+   17.1077
+  ]
+ },
+ {
+  "name": "Šumperk → Jeseník (přes Červenohorské sedlo)",
+  "from": [
+   49.9653,
+   16.9706
+  ],
+  "to": [
+   50.2294,
+   17.2046
+  ],
+  "to_place": "Jeseník"
+ },
+ {
+  "name": "Rýmařov → Karlova Studánka",
+  "from": [
+   49.9318,
+   17.2719
+  ],
+  "to": [
+   50.0716,
+   17.3052
+  ],
+  "to_place": "Karlova Studánka"
+ },
+ {
+  "name": "Bruntál → Zlaté Hory",
+  "from": [
+   49.9884,
+   17.4647
+  ],
+  "to": [
+   50.2639,
+   17.3961
+  ],
+  "to_place": "Zlaté Hory"
+ },
+ {
+  "name": "Olomouc → Velké Losiny",
+  "from": [
+   49.5938,
+   17.2509
+  ],
+  "to": [
+   50.0281,
+   17.0387
+  ],
+  "to_place": "Velké Losiny"
+ }
 ]
