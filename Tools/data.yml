@@ -100,7 +100,7 @@ jobs:
           # small files that may change without changing size: always upload
           E="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           for f in meta.json config.json; do aws s3 cp "site/v1/$f" "s3://$R2_BUCKET/v1/$f" --endpoint-url "$E" --only-show-errors; done
-          aws s3 sync site/v1/style "s3://$R2_BUCKET/v1/style" --endpoint-url "$E" --exact-timestamps --only-show-errors
+          aws s3 sync site/v1/style "s3://$R2_BUCKET/v1/style" --endpoint-url "$E" --only-show-errors
       - name: Upozornění na problém (GitHub issue → e-mail)
         if: ${{ hashFiles('problems.md') != '' }}
         env:
