@@ -20,11 +20,11 @@ REGULAR, BOLD = ["Noto Sans Regular"], ["Noto Sans Bold"]
 
 PALETTES = {
     "day": {
-        "background": "#f6f1e7", "wood": "#cfe2bf", "grass": "#e1ecd0", "residential": "#efe7da",
-        "farmland": "#f3edd9", "industrial": "#ece4e4", "cemetery": "#dbe6d2",
+        "background": "#f7f1e3", "wood": "#bfdaa6", "grass": "#d6e8c0", "residential": "#f0e4d2",
+        "farmland": "#f2ead0", "industrial": "#ece4e4", "cemetery": "#dbe6d2",
         "water": "#a3cbef", "waterway": "#86b8e6", "building": "#e6dccd",
         "motorway": "#c7c9d2", "motorway_case": "#a9acb8",
-        "trunk": "#fde9b6", "major": "#ffffff", "major_case": "#b3a38c", "minor": "#ffffff", "minor_case": "#cfc5b4",
+        "trunk": "#fbd27a", "secondary": "#fdeeb8", "major": "#ffffff", "major_case": "#b39a78", "minor": "#ffffff", "minor_case": "#cfc5b4",
         "rail": "#b9b4ac", "boundary": "#9b8fb0",
         "label": "#2a241c", "label_soft": "#5a5247", "halo": "#f6f1e7", "water_label": "#3d6f9e", "peak": "#7a5b3a",
         "poi": "#e8590c", "poi_stroke": "#ffffff",
@@ -34,7 +34,7 @@ PALETTES = {
         "farmland": "#1e2126", "industrial": "#25252b", "cemetery": "#1f2822",
         "water": "#1d2d40", "waterway": "#26405c", "building": "#2a2e36",
         "motorway": "#5c616d", "motorway_case": "#454955",
-        "trunk": "#d8c48f", "major": "#c9ccd4", "major_case": "#1b1e24", "minor": "#7d828e", "minor_case": "#1b1e24",
+        "trunk": "#d9b768", "secondary": "#c9bc94", "major": "#c9ccd4", "major_case": "#1b1e24", "minor": "#7d828e", "minor_case": "#1b1e24",
         "rail": "#4a4e57", "boundary": "#7a6f92",
         "label": "#f1f2f4", "label_soft": "#b9bcc4", "halo": "#1b1e24", "water_label": "#7fa6cf", "peak": "#c9a27a",
         "poi": "#f06a1f", "poi_stroke": "#1b1e24",
@@ -105,7 +105,8 @@ def build(name):
         road("motorway-case", ["motorway"], p["motorway_case"], motorway_case),
         road("motorway", ["motorway"], p["motorway"], motorway_w),
         road("major-case", MAJOR, p["major_case"], major_case, minzoom=6),
-        road("major", ["secondary", "tertiary"], p["major"], major_w, minzoom=6),
+        road("major", ["tertiary"], p["major"], major_w, minzoom=6),
+        road("secondary", ["secondary"], p["secondary"], major_w, minzoom=6),
         # Main roads (trunk, primary) slightly warm, so the network reads at a glance (not a cold grey map).
         road("trunk", ["trunk", "primary"], p["trunk"], major_w, minzoom=6),
         {"id": "road-name", "type": "symbol", "source": "omt", "source-layer": "transportation_name", "minzoom": 13,
