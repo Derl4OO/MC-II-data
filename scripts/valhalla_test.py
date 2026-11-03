@@ -6,8 +6,10 @@ import json, math, os, sys, time, urllib.request
 SERVER = os.environ.get("VALHALLA", "http://localhost:8002")
 KINDS = {
     "fast": {"use_highways": 1.0, "use_tolls": 0.5},
+    # Normální: hledáme nastavení, které nejede po dálnici, ale ani zbytečně po vesnicích (2. test).
     "normal": {"use_highways": 0.0, "use_tolls": 0.0},
-    "fun": {"use_highways": 0.0, "use_tolls": 0.5},
+    "normal_02": {"use_highways": 0.2, "use_tolls": 0.0},
+    "normal_04": {"use_highways": 0.4, "use_tolls": 0.0},
 }
 
 def decode(polyline, precision=6):
@@ -66,7 +68,15 @@ def route(frm, to, kind):
     steps = sum(len(l.get("steps", [])) for l in legs)
     has_segment_times = any("annotation" in l for l in legs)
     b, s = bends(coords)
+    # Silnice podle délky (ref nebo název), aby šlo poznat, kudy trasa vede.
+    roads = {}
+    for leg in legs:
+        for step in leg.get("steps", []):
+            key = step.get("ref") or step.get("name") or "?"
+            roads[key] = roads.get(key, 0) + step.get("distance", 0)
+    top = [f"{k} {round(v / 1000)} km" for k, v in sorted(roads.items(), key=lambda kv: -kv[1])[:5]]
     return {"distance_km": round(r["distance"] / 1000, 1), "duration_min": round(r["duration"] / 60), "bends": b, "sharp": s,
+            "avg_kmh": round(r["distance"] / max(r["duration"], 1) * 3.6), "roads": top,
             "steps": steps, "segment_times": has_segment_times, "ms": round(took * 1000)}, coords
 
 def main(out):
@@ -89,15 +99,15 @@ def main(out):
     json.dump({"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "routes": rows}, open(os.path.join(out, "report.json"), "w"), ensure_ascii=False, indent=1)
     json.dump({"type": "FeatureCollection", "features": features}, open(os.path.join(out, "routes.geojson"), "w"))
     def cell(i):
-        return "—" if "error" in i else f"{i['distance_km']} km · {i['duration_min']} min · {i['bends']} zatáček ({i['sharp']} ostrých)"
+        return "—" if "error" in i else f"{i['distance_km']} km · {i['duration_min']} min · {i['bends']} zatáček, ⌀ {i['avg_kmh']} km/h<br><small>{', '.join(i['roads'])}</small>"
     table = "".join(f"<tr><td>{r['name']}</td>" + "".join(f"<td>{cell(r[k])}</td>" for k in KINDS) + "</tr>" for r in rows)
     html = f"""<!doctype html><meta charset=utf-8><title>MotoCesta – test Valhally</title>
 <link rel=stylesheet href=https://unpkg.com/leaflet@1.9.4/dist/leaflet.css><script src=https://unpkg.com/leaflet@1.9.4/dist/leaflet.js></script>
 <style>body{{font:14px -apple-system,Arial;margin:16px}}#map{{height:520px}}table{{border-collapse:collapse;margin-top:12px}}td,th{{border:1px solid #ddd;padding:4px 8px}}</style>
-<h1>Test Valhally – motorkářský profil</h1><p>Rychlá modře, Normální šedě, Zábavná oranžově. Mapa © přispěvatelé OpenStreetMap.</p><div id=map></div>
-<table><tr><th>Trasa</th><th>Rychlá</th><th>Normální</th><th>Zábavná (základ, bez objížděk)</th></tr>{table}</table>
+<h1>Test Valhally – motorkářský profil</h1><p>Rychlá modře, Normální 0,0 šedě, 0,2 oranžově, 0,4 zeleně. Mapa © přispěvatelé OpenStreetMap.</p><div id=map></div>
+<table><tr><th>Trasa</th><th>Rychlá</th><th>Normální 0,0</th><th>Normální 0,2</th><th>Normální 0,4</th></tr>{table}</table>
 <script>const m=L.map('map').setView([49.4,17.5],7);L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap'}}).addTo(m);
-fetch('routes.geojson').then(r=>r.json()).then(g=>L.geoJSON(g,{{style:f=>({{color:{{fast:'#1f6fe5',normal:'#888',fun:'#e8590c'}}[f.properties.kind],weight:3}})}}).bindPopup(l=>l.feature.properties.name+' · '+l.feature.properties.kind).addTo(m));</script>"""
+fetch('routes.geojson').then(r=>r.json()).then(g=>L.geoJSON(g,{{style:f=>({{color:{{fast:'#1f6fe5',normal:'#888',normal_02:'#e8590c',normal_04:'#2b8a3e'}}[f.properties.kind],weight:3}})}}).bindPopup(l=>l.feature.properties.name+' · '+l.feature.properties.kind).addTo(m));</script>"""
     open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(html)
     print(f"Hotovo: {len(rows)} tras, {failures} chyb")
     if failures > len(rows):  # more than a third of requests failed
