@@ -76,7 +76,7 @@ def road(layer_id, classes, color, line_width, minzoom=0, dash=None):
 
 # Looks approved for the preview 3. 11. 2026 (Julien + Codex + Claude): Moto Light for planning, Topo Touring
 # for browsing a trip (stronger hills and curves), Rider Focus for riding (calm, big, few labels). Day light, night dark.
-_LIGHT = {"background": "#f4f2ec", "wood": "#dbe6d1", "grass": "#e4ecd9", "residential": "#eeeae2", "farmland": "#f4f2ec",
+_LIGHT_COOL = {"background": "#f4f2ec", "wood": "#dbe6d1", "grass": "#e4ecd9", "residential": "#eeeae2", "farmland": "#f4f2ec",
           "industrial": "#ebe8e2", "cemetery": "#dfe8d6", "wetland": "#dfe9e0", "water": "#d3e5ea", "waterway": "#b3d3de",
           "building": "#e6e1d8", "outline": "#d8d1c4", "motorway": "#ead9c0", "motorway_case": "#cdb795",
           "trunk": "#ffffff", "secondary": "#ffffff", "major": "#ffffff", "major_case": "#c9c3b8", "minor": "#ffffff",
@@ -84,13 +84,22 @@ _LIGHT = {"background": "#f4f2ec", "wood": "#dbe6d1", "grass": "#e4ecd9", "resid
           "label": "#2a2722", "label_soft": "#6b665c", "halo": "#f4f2ec", "water_label": "#3f6f86", "peak": "#7a6a55",
           "poi": "#d9733a", "poi_stroke": "#ffffff", "protected": "#7c9a6a",
           "curve1": "#c7704f", "curve2": "#b0402e", "curve_opacity": 0.3, "shadow": "#8a7a65", "highlight": "#fffaf0", "hillshade": 0.22}
-_DARK = {"background": "#1f221e", "wood": "#252c23", "grass": "#252b22", "residential": "#292a26", "farmland": "#20231f",
-         "industrial": "#2a2a27", "cemetery": "#242b22", "wetland": "#212925", "water": "#1b2a31", "waterway": "#264150",
-         "building": "#30312c", "outline": "#3a3b35", "motorway": "#6b5c48", "motorway_case": "#141612",
-         "trunk": "#a7a99f", "secondary": "#959990", "major": "#8f948a", "major_case": "#141612", "minor": "#6b7066",
-         "minor_case": "#141612", "tunnel": "#3a3d36", "rail": "#4a4d46", "boundary": "#7d6e8c",
-         "label": "#ece7dc", "label_soft": "#b5ae9f", "halo": "#1f221e", "water_label": "#86a8bd", "peak": "#c9a27a",
-         "poi": "#e07a3f", "poi_stroke": "#1f221e", "protected": "#5f8a52",
+# Warmer and livelier than the first version (Julien 3. 11.: "moc studená / šedá").
+_LIGHT = {"background": "#f6f1e6", "wood": "#cde1ba", "grass": "#dbeac7", "residential": "#efe6d7", "farmland": "#f4eede",
+          "industrial": "#ece5dc", "cemetery": "#d9e6cc", "wetland": "#d9e8d6", "water": "#b6daeb", "waterway": "#96c7e2",
+          "building": "#e8dccb", "outline": "#d9cbb5", "motorway": "#f2cf9f", "motorway_case": "#d6a466",
+          "trunk": "#fff3d6", "secondary": "#ffffff", "major": "#ffffff", "major_case": "#c2b197", "minor": "#ffffff",
+          "minor_case": "#d9ccb8", "tunnel": "#e6dccd", "rail": "#c7bdb0", "boundary": "#a593b3",
+          "label": "#2b261f", "label_soft": "#6a5f50", "halo": "#f6f1e6", "water_label": "#2f6d93", "peak": "#7a5b3a",
+          "poi": "#d9733a", "poi_stroke": "#ffffff", "protected": "#6f9a5a",
+          "curve1": "#d0703f", "curve2": "#b8402e", "curve_opacity": 0.32, "shadow": "#8a6f52", "highlight": "#fffaf0", "hillshade": 0.26}
+_DARK = {"background": "#211f1b", "wood": "#262c21", "grass": "#262b20", "residential": "#2a2721", "farmland": "#22201c",
+         "industrial": "#2b2823", "cemetery": "#252a20", "wetland": "#222823", "water": "#1b2b35", "waterway": "#25445a",
+         "building": "#322e27", "outline": "#3c372f", "motorway": "#73603f", "motorway_case": "#15130f",
+         "trunk": "#c9b98f", "secondary": "#a9a393", "major": "#9c9686", "major_case": "#15130f", "minor": "#746e62",
+         "minor_case": "#15130f", "tunnel": "#3c3830", "rail": "#4f4a41", "boundary": "#7d6e8c",
+         "label": "#efe8db", "label_soft": "#b9ad99", "halo": "#211f1b", "water_label": "#86a8bd", "peak": "#c9a27a",
+         "poi": "#e8843f", "poi_stroke": "#211f1b", "protected": "#5f8a52",
          "curve1": "#d9873a", "curve2": "#c9302c", "curve_opacity": 0.35, "shadow": "#000000", "highlight": "#3a342c", "hillshade": 0.2}
 _FOCUS_HIDE = ["poi-rider-name", "places", "protected-line", "protected-name", "peak", "pass", "building", "wetland",
                "cemetery", "industrial", "curves-1", "curves-2", "oneway", "water-name"]
@@ -99,8 +108,8 @@ LOOKS = {
     "topo-touring": ("Topo Touring – prohlížení výletu (kopce a zatáčky výrazněji)",
                      {"day": dict(_LIGHT, hillshade=0.45, curve_opacity=0.5), "night": dict(_DARK, hillshade=0.35, curve_opacity=0.5)}, 1.0),
     "rider-focus": ("Rider Focus – navigace (klidná, velká, málo popisků)",
-                    {"day": dict(_LIGHT, major_case="#a39d90", minor_case="#c6c0b4", hillshade=0.12, hide=_FOCUS_HIDE),
-                     "night": dict(_DARK, trunk="#c4c6bc", secondary="#b1b4aa", major="#a6aaa0", hillshade=0.12, hide=_FOCUS_HIDE)}, 1.25),
+                    {"day": dict(_LIGHT, major_case="#a8977e", minor_case="#c9bba6", hillshade=0.14, hide=_FOCUS_HIDE),
+                     "night": dict(_DARK, trunk="#d6c79c", secondary="#bdb5a2", major="#aea796", hillshade=0.12, hide=_FOCUS_HIDE)}, 1.25),
 }
 
 
