@@ -230,7 +230,7 @@ def write_page(rows, features, kinds, out):
 <p><label>Trasa: <select id=pick></select></label> nebo klikni na řádek tabulky.</p><p>{checks}</p><div id=map></div>
 <table><tr><th>Trasa</th>{head}</tr>{table}</table>
 <script>if(!window.L){{document.getElementById('warn').textContent='Mapa se nenačetla (chybí knihovna Leaflet). Otevřete stránku v Safari/Chrome s internetem.';}}
-const m=L.map('map').setView([49.4,17.5],7);L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}.png',{{subdomains:'abcd',maxZoom:19,attribution:'© OpenStreetMap, © CARTO'}}).addTo(m);
+const m=L.map('map').setView([49.4,17.5],7);const tiles=[['https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}.png','© OpenStreetMap, © CARTO'],['https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png','© OpenStreetMap'],['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{{z}}/{{y}}/{{x}}','© Esri, OpenStreetMap']];let ti=0,tl=null;function base(){{if(tl)m.removeLayer(tl);let ok=0,bad=0;const t=tiles[ti];tl=L.tileLayer(t[0],{{subdomains:'abcd',maxZoom:19,attribution:t[1]}}).on('tileload',()=>ok++).on('tileerror',()=>{{bad++;if(!ok&&bad>3&&ti<tiles.length-1){{ti++;base();}}else if(!ok&&bad>3){{document.getElementById('warn').textContent='Podklad mapy se nenačetl – zkontrolujte internet (trasy se ukazují i tak).';}}}}).addTo(m);tl.bringToBack();}}base();
 const g={geo};const colors={json.dumps(COLORS)};const labels={json.dumps(LABELS, ensure_ascii=False)};
 const names=[...new Set(g.features.map(f=>f.properties.name))];const sel=document.getElementById('pick');
 sel.innerHTML='<option value="">Všechny trasy</option>'+names.map(n=>`<option>${{n}}</option>`).join('');
