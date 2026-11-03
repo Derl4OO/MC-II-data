@@ -29,4 +29,4 @@ V repozitáři MC-II-data na github.com → **Settings** → **Secrets and varia
 - `R2_SECRET_ACCESS_KEY` = Secret Access Key
 
 Hotovo. Workflow „Data MotoCesta (Evropa)“ pak sám nahraje celá data do R2 a GitHub Pages dostane zkrácenou kopii pro dnešní aplikace.
-Napiš mi jen „R2 hotovo“ a veřejnou adresu z kroku 2 – přepnu na ni styl mapy a aplikace (přes vzdálený config.json).
+Hotovo 3. 11. 2026: veřejná adresa https://pub-15c918f368aa43dc85e3ec15c72e311c.r2.dev (data v /v1/). Napiš mi jen „R2 hotovo“ a veřejnou adresu z kroku 2 – přepnu na ni styl mapy a aplikace (přes vzdálený config.json).

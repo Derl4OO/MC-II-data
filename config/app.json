@@ -3,5 +3,9 @@
     "provider": "mapbox",
     "url": "",
     "key": ""
+  },
+  "data": {
+    "url": "https://pub-15c918f368aa43dc85e3ec15c72e311c.r2.dev/v1/",
+    "_info": "Úplná data pro celou Evropu (Cloudflare R2). Aplikace je začnou používat po aktualizaci; do té doby GitHub Pages."
   }
 }
