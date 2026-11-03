@@ -62,8 +62,19 @@ def road(layer_id, classes, color, line_width, minzoom=0, dash=None):
             "layout": {"line-cap": "round", "line-join": "round"}, "paint": paint}
 
 
-def build(name):
-    p = PALETTES[name]
+def build(name, palette=None, scale=1.0):
+    """palette/scale: other looks for the preview page (variants to choose from)."""
+    p = dict(PALETTES[name], **(palette or {}))
+    global width
+    plain = width
+    width = lambda stops: plain([(z, w * scale) for z, w in stops])  # noqa: E731 - road widths of the variant
+    try:
+        return _build(name, p)
+    finally:
+        width = plain
+
+
+def _build(name, p):
     major_w = width([(6, 0.8), (10, 2.4), (13, 5), (16, 14), (18, 30)])
     major_case = width([(6, 1.4), (10, 3.6), (13, 7), (16, 17), (18, 34)])
     minor_w = width([(11, 0.6), (13, 1.8), (16, 7), (18, 16)])
