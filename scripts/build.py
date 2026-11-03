@@ -150,14 +150,14 @@ def region_rules(lat, lon):
 COND_RE = re.compile(r"(\d+)\s*@\s*\(?([^;)]*)\)?")
 
 def conditional_limits(tags, limit):
-    """{"wet": 110, "times": [[130, "19:00-06:00"]]} for the road piece (only what differs from limit)."""
+    """{"wet": 110, "times": [{"limit": 130, "hours": "19:00-06:00"}]} for the road piece (only what differs)."""
     extra, times = {}, []
     for value, condition in COND_RE.findall(tags.get("maxspeed:conditional", "")):
         condition = condition.strip().lower()
         if condition == "wet":
             extra["wet"] = int(value)
         elif re.match(r"^\d{1,2}:\d{2}-\d{1,2}:\d{2}$", condition):
-            times.append([int(value), condition])
+            times.append({"limit": int(value), "hours": condition})
     if "wet" not in extra and limit:
         wet = RULES.get("wet", {}).get(str(limit))
         if wet:  # only fast limits have a wet value (FR 130→110, 110→100, 90→80; IT; LU)
