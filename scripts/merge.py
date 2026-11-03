@@ -104,7 +104,7 @@ def trim_for_pages(site, pages, countries):
                 continue
             shutil.rmtree(os.path.join(out, "pois", "n", cc), ignore_errors=True)
             shutil.rmtree(os.path.join(out, "addr", cc), ignore_errors=True)
-            for name in ("radars", "fuel", "sights"):
+            for name in ("fuel", "sights"):  # radars stay: today's apps use radars/<cc>.json abroad
                 path = os.path.join(out, name, f"{cc}.json")
                 if os.path.exists(path):
                     os.remove(path)
