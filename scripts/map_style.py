@@ -18,6 +18,10 @@ TILES = "https://tiles.openfreemap.org/planet"
 GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf"
 # Our own icons (road number shields, fuel, café), drawn by Claude: style-assets/sprite*.png/json.
 SPRITE = "https://derl4oo.github.io/MC-II-data/v1/style/sprite"
+# Our layer (moto_tiles.py): curvy roads in two levels and our places (castles, viewpoints, motorests…).
+MOTO_TILES = "https://derl4oo.github.io/MC-II-data/v1/moto/{z}/{x}/{y}.pbf"
+# Flat hill shading (not 3D): open elevation tiles on AWS Open Data (Terrain Tiles, Mapzen), no key.
+DEM_TILES = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 ATTRIBUTION = "© OpenMapTiles © přispěvatelé OpenStreetMap"
 REGULAR, BOLD = ["Noto Sans Regular"], ["Noto Sans Bold"]
 
@@ -32,17 +36,20 @@ PALETTES = {
         "label": "#2a241c", "label_soft": "#5a5247", "halo": "#f6f1e7", "water_label": "#3d6f9e", "peak": "#7a5b3a",
         "poi": "#e8590c", "poi_stroke": "#ffffff",
         "protected": "#6f9a5a", "tunnel": "#d9d2c6", "outline": "#d3c8b6", "wetland": "#dbe8d8",
+        "curve1": "#f6a04d", "curve2": "#e03131", "shadow": "#6b5a45", "highlight": "#fffaf0",
     },
+    # Night: the same style, warm and dimmed (no cold blue-grey glare in the dark).
     "night": {
-        "background": "#1b1e24", "wood": "#1f2a22", "grass": "#212a22", "residential": "#22262d",
-        "farmland": "#1e2126", "industrial": "#25252b", "cemetery": "#1f2822",
-        "water": "#1d2d40", "waterway": "#26405c", "building": "#2a2e36",
-        "motorway": "#5c616d", "motorway_case": "#454955",
-        "trunk": "#d9b768", "secondary": "#c9bc94", "major": "#c9ccd4", "major_case": "#1b1e24", "minor": "#7d828e", "minor_case": "#1b1e24",
-        "rail": "#4a4e57", "boundary": "#7a6f92",
-        "label": "#f1f2f4", "label_soft": "#b9bcc4", "halo": "#1b1e24", "water_label": "#7fa6cf", "peak": "#c9a27a",
-        "poi": "#f06a1f", "poi_stroke": "#1b1e24",
-        "protected": "#5f8a52", "tunnel": "#3a3e47", "outline": "#30343c", "wetland": "#1e2826",
+        "background": "#1f1c19", "wood": "#232a1f", "grass": "#242a20", "residential": "#26221e",
+        "farmland": "#211e1a", "industrial": "#28241f", "cemetery": "#232920",
+        "water": "#1a2833", "waterway": "#223a4c", "building": "#2c2823",
+        "motorway": "#6b5c48", "motorway_case": "#4a4034",
+        "trunk": "#c9a35a", "secondary": "#b8a682", "major": "#bdb3a4", "major_case": "#1f1c19", "minor": "#7f776b", "minor_case": "#1f1c19",
+        "rail": "#4d4740", "boundary": "#7d6e8c",
+        "label": "#efe8dc", "label_soft": "#b8ad9c", "halo": "#1f1c19", "water_label": "#7f9fba", "peak": "#c9a27a",
+        "poi": "#e8620f", "poi_stroke": "#1f1c19",
+        "protected": "#5f8a52", "tunnel": "#3b3630", "outline": "#35302a", "wetland": "#202722",
+        "curve1": "#d9873a", "curve2": "#c9302c", "shadow": "#000000", "highlight": "#3a342c",
     },
 }
 
@@ -178,6 +185,10 @@ def _build(name, p):
              "layers": layers}
     if p.get("extras", True):
         style["sprite"] = SPRITE
+        style["sources"]["moto"] = {"type": "vector", "tiles": [MOTO_TILES], "minzoom": 8, "maxzoom": 12,
+                                    "attribution": "© přispěvatelé OpenStreetMap, MotoCesta"}
+        style["sources"]["dem"] = {"type": "raster-dem", "tiles": [DEM_TILES], "encoding": "terrarium", "tileSize": 256,
+                                   "maxzoom": 12, "attribution": "Terrain Tiles (Mapzen, AWS Open Data)"}
     return style
 
 
@@ -218,6 +229,43 @@ def tune(layers, p, major_w, minor_w, name):
            "layout": {"text-field": ["coalesce", ["get", "name:cs"], ["get", "name"]], "text-font": ["Noto Sans Italic"],
                       "text-size": 13, "text-max-width": 9},
            "paint": {"text-color": p["protected"], "text-halo-color": p["halo"], "text-halo-width": 1.5}})
+    # Flat hill shading (Julien 3. 11.: ok if not 3D terrain), soft and warm.
+    after("protected-line",
+          {"id": "hillshade", "type": "hillshade", "source": "dem", "maxzoom": 16,
+           "paint": {"hillshade-exaggeration": 0.3 if name == "day" else 0.22, "hillshade-shadow-color": p["shadow"],
+                     "hillshade-highlight-color": p["highlight"], "hillshade-accent-color": p["shadow"],
+                     "hillshade-illumination-anchor": "map"}})
+    # Curvy roads: a glow under the road, light orange (l=1) and sharper red (l=2), as approved 3. 11.
+    glow = width([(8, 3), (10, 5), (13, 11), (16, 24), (18, 44)])
+    after("tunnel",
+          {"id": "curves-1", "type": "line", "source": "moto", "source-layer": "curves", "filter": ["==", ["get", "l"], 1],
+           "layout": {"line-cap": "round", "line-join": "round"},
+           "paint": {"line-color": p["curve1"], "line-width": glow, "line-opacity": 0.55, "line-blur": 1.5}},
+          {"id": "curves-2", "type": "line", "source": "moto", "source-layer": "curves", "filter": ["==", ["get", "l"], 2],
+           "layout": {"line-cap": "round", "line-join": "round"},
+           "paint": {"line-color": p["curve2"], "line-width": glow, "line-opacity": 0.6, "line-blur": 1.5}})
+    # Bridges: a darker edge, so they read as bridges when close.
+    road_colors = ["match", ["get", "class"], ["trunk", "primary"], p["trunk"], "secondary", p["secondary"],
+                   "motorway", p["motorway"], ["minor", "service"], p["minor"], p["major"]]
+    after("trunk",
+          {"id": "bridge-case", "type": "line", "source": "omt", "source-layer": "transportation", "minzoom": 13,
+           "filter": ["all", ["==", ["get", "brunnel"], "bridge"], ["in", ["get", "class"], ["literal", MAJOR + MINOR + ["motorway"]]]],
+           "layout": {"line-join": "round"}, "paint": {"line-color": p["label_soft"], "line-width": width([(13, 8), (16, 19), (18, 37)])}},
+          {"id": "bridge", "type": "line", "source": "omt", "source-layer": "transportation", "minzoom": 13,
+           "filter": ["all", ["==", ["get", "brunnel"], "bridge"], ["in", ["get", "class"], ["literal", MAJOR + MINOR + ["motorway"]]]],
+           "layout": {"line-join": "round"}, "paint": {"line-color": road_colors, "line-width": major_w}},
+          {"id": "oneway", "type": "symbol", "source": "omt", "source-layer": "transportation", "minzoom": 16,
+           "filter": ["all", ["in", ["get", "oneway"], ["literal", [1, -1]]], ["in", ["get", "class"], ["literal", MAJOR + MINOR]]],
+           "layout": {"symbol-placement": "line", "symbol-spacing": 90, "icon-image": f"oneway-{name}",
+                      "icon-rotate": ["case", ["==", ["get", "oneway"], -1], 180, 0], "icon-rotation-alignment": "map",
+                      "icon-allow-overlap": True, "icon-size": 0.9}})
+    # Our places from MC-II-data (castles, ruins, viewpoints, waterfalls, motorests).
+    after("poi-rider-name",
+          {"id": "places", "type": "symbol", "source": "moto", "source-layer": "places", "minzoom": 10,
+           "layout": {"icon-image": ["concat", ["get", "k"], f"-{name}"], "icon-size": width([(10, 0.7), (16, 1.05)]),
+                      "text-field": ["step", ["zoom"], "", 13, ["get", "n"]], "text-font": REGULAR, "text-size": 12,
+                      "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": True, "text-max-width": 9},
+           "paint": {"text-color": p["label_soft"], "text-halo-color": p["halo"], "text-halo-width": 1.5}})
     # Road numbers in shields (main roads yellow, others white) and icons for fuel and cafés.
     for layer in layers:
         if layer["id"] == "road-ref":

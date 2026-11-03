@@ -496,6 +496,13 @@ def main(work, site):
         map_style.main(out)
     except Exception as error:
         print("::warning::Styl mapy selhal:", error)
+    # Vlastní vrstva mapy: zatáčkovité silnice (2 úrovně) a naše místa, v1/moto/{z}/{x}/{y}.pbf, viz moto_tiles.py.
+    moto = {}
+    try:
+        import moto_tiles
+        moto = moto_tiles.main(work, out)
+    except Exception as error:
+        print("::warning::Vrstva zatáček selhala:", error)
     # Uzavírky z oficiálních zdrojů (zatím Německo). Měsíčně jen na zkoušku, ostrý provoz poběží častěji na serveru.
     try:
         import closures
@@ -504,7 +511,7 @@ def main(work, site):
         print("::warning::Uzavírky selhaly:", error)
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "roads": roads, "tiles": tiles,
             "speedCameras": cams, "fuelStations": fuel, "sights": sights, "urbanCells": len(URBAN_CELLS), "citySigns": signs, "pois": pois, "addresses": addresses, "addressFiles": address_files,
-            "limits": dict(LIMIT_STATS, noneShare=round(LIMIT_STATS["none"] / max(1, sum(LIMIT_STATS.values())), 4)), "license": "© OpenStreetMap contributors, ODbL 1.0", "addressLicense": "RÚIAN © ČÚZK, CC BY 4.0"}
+            "limits": dict(LIMIT_STATS, noneShare=round(LIMIT_STATS["none"] / max(1, sum(LIMIT_STATS.values())), 4)), "license": "© OpenStreetMap contributors, ODbL 1.0", "addressLicense": "RÚIAN © ČÚZK, CC BY 4.0", "mapLayer": moto}
     with open(os.path.join(out, "meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
     with open(os.path.join(site, "index.html"), "w", encoding="utf-8") as f:
