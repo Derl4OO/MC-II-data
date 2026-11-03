@@ -490,6 +490,12 @@ def main(work, site):
         shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "app.json"), os.path.join(out, "config.json"))
     except Exception as error:
         print("::warning::config.json chybí:", error)
+    # Vlastní styl mapy pro MapLibre (den/noc), v1/style/*.json, viz map_style.py.
+    try:
+        import map_style
+        map_style.main(out)
+    except Exception as error:
+        print("::warning::Styl mapy selhal:", error)
     # Uzavírky z oficiálních zdrojů (zatím Německo). Měsíčně jen na zkoušku, ostrý provoz poběží častěji na serveru.
     try:
         import closures
