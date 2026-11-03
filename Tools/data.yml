@@ -1,0 +1,99 @@
+# MotoCesta data pro celou Evropu: každá země zvlášť a souběžně, pak spojení a nasazení na GitHub Pages.
+# Země jsou v config/countries.json (přidat zemi = přidat řádek). Zkopírovat do .github/workflows/data.yml.
+name: Data MotoCesta (Evropa)
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"   # každé pondělí ráno
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      countries: ${{ steps.list.outputs.countries }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          echo "countries=$(python3 -c 'import json; print(json.dumps([{"id": c["id"], "geofabrik": c["geofabrik"]} for c in json.load(open("config/countries.json"))["countries"]]))')" >> "$GITHUB_OUTPUT"
+
+  country:
+    needs: setup
+    name: ${{ matrix.country.id }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        country: ${{ fromJSON(needs.setup.outputs.countries) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nástroje
+        run: sudo apt-get update && sudo apt-get install -y osmium-tool
+      - name: Stažení OpenStreetMap (Geofabrik)
+        run: curl -sSfL --retry 3 -o ${{ matrix.country.id }}.osm.pbf https://download.geofabrik.de/${{ matrix.country.geofabrik }}-latest.osm.pbf
+      - name: Minulá přijatá verze
+        uses: actions/cache/restore@v4
+        with:
+          path: accepted/${{ matrix.country.id }}
+          key: country-${{ matrix.country.id }}-${{ github.run_id }}
+          restore-keys: country-${{ matrix.country.id }}-
+      - name: Sestavení země
+        run: python3 scripts/region.py ${{ matrix.country.id }} work out/${{ matrix.country.id }} accepted/${{ matrix.country.id }}
+      - name: Přijatá verze pro příště
+        id: accepted
+        run: |
+          if [ -f out/${{ matrix.country.id }}/ACCEPTED ]; then
+            rm -rf accepted/${{ matrix.country.id }} && mkdir -p accepted && cp -r out/${{ matrix.country.id }} accepted/
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.accepted.outputs.ok == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: accepted/${{ matrix.country.id }}
+          key: country-${{ matrix.country.id }}-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part-${{ matrix.country.id }}
+          path: out/${{ matrix.country.id }}
+          retention-days: 3
+
+  site:
+    needs: [setup, country]
+    if: ${{ !cancelled() && needs.setup.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: part-*
+          path: parts
+      - name: Složky zemí
+        run: cd parts && for d in part-*; do mv "$d" "${d#part-}"; done && ls
+      - name: Spojení a sestavení webu
+        run: python3 scripts/merge.py parts work site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

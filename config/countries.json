@@ -1,0 +1,23 @@
+{
+ "_info": "Země dat MotoCesty. Přidat zemi = přidat řádek (id = kód země, geofabrik = cesta na download.geofabrik.de). limits: true jen po ověření zákonných pravidel limitů.",
+ "countries": [
+  {"id": "cz", "name": "Česko", "geofabrik": "europe/czech-republic", "limits": true},
+  {"id": "sk", "name": "Slovensko", "geofabrik": "europe/slovakia", "limits": true},
+  {"id": "pl", "name": "Polsko", "geofabrik": "europe/poland"},
+  {"id": "de", "name": "Německo", "geofabrik": "europe/germany"},
+  {"id": "at", "name": "Rakousko", "geofabrik": "europe/austria"},
+  {"id": "hu", "name": "Maďarsko", "geofabrik": "europe/hungary"},
+  {"id": "si", "name": "Slovinsko", "geofabrik": "europe/slovenia"},
+  {"id": "hr", "name": "Chorvatsko", "geofabrik": "europe/croatia"},
+  {"id": "ch", "name": "Švýcarsko", "geofabrik": "europe/switzerland"},
+  {"id": "li", "name": "Lichtenštejnsko", "geofabrik": "europe/liechtenstein"},
+  {"id": "it", "name": "Itálie", "geofabrik": "europe/italy"},
+  {"id": "fr", "name": "Francie", "geofabrik": "europe/france"},
+  {"id": "es", "name": "Španělsko", "geofabrik": "europe/spain"},
+  {"id": "pt", "name": "Portugalsko", "geofabrik": "europe/portugal"},
+  {"id": "ad", "name": "Andorra", "geofabrik": "europe/andorra"},
+  {"id": "be", "name": "Belgie", "geofabrik": "europe/belgium"},
+  {"id": "nl", "name": "Nizozemsko", "geofabrik": "europe/netherlands"},
+  {"id": "lu", "name": "Lucembursko", "geofabrik": "europe/luxembourg"}
+ ]
+}

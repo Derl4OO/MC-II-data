@@ -372,11 +372,14 @@ POI_FILTERS = ["nw/shop", "nw/amenity=cafe,restaurant,fast_food,pub,bar,fuel,mot
                # Obce a města: hledání cíle bez Mapboxu (okamžitě a i bez signálu).
                "n/place=city,town,village,hamlet,suburb"]
 
-def extract_pois(work):
+# Other countries (region.py): the same, but of shops only motorcycle shops and big shops (smaller files).
+POI_FILTERS_FOREIGN = ["nw/shop=motorcycle,motorcycle_repair,mall,department_store,supermarket"] + POI_FILTERS[1:]
+
+def extract_pois(work, filters=None):
     for pbf in sorted(glob.glob("*.osm.pbf")):
         c = os.path.basename(pbf).split(".")[0]
         try:
-            subprocess.run(["osmium", "tags-filter", pbf, *POI_FILTERS, "-o", f"pois-{c}.pbf", "--overwrite"], check=True)
+            subprocess.run(["osmium", "tags-filter", pbf, *(filters or POI_FILTERS), "-o", f"pois-{c}.pbf", "--overwrite"], check=True)
             subprocess.run(["osmium", "add-locations-to-ways", f"pois-{c}.pbf", "-f", "opl,add_metadata=false",
                             "-o", os.path.join(work, f"pois-{c}.opl"), "--overwrite"], check=True)
         except (OSError, subprocess.CalledProcessError) as error:
@@ -420,33 +423,50 @@ def write_bin(path, rows):
 def build_pois(work, out_dir):
     """pois/n/<2 letters>.bin: places whose name has a word starting with those letters (name search);
     pois/t/<x>_<y>.bin: places in a road tile ("near me" chips). Row = [lat, lon, name, kind, town]."""
-    tmp = os.path.join(out_dir, "pois.tmp.json")
+    rows = poi_rows(work, out_dir)
+    write_pois(rows, out_dir)
+    return len(rows)
+
+def poi_rows(work, tmp_dir):
+    """Rows [lat, lon, name, kind, town] from pois-*.opl (also used per country by region.py)."""
+    tmp = os.path.join(tmp_dir, "pois.tmp.json")
     build_points(sorted(glob.glob(os.path.join(work, "pois-*.opl"))), tmp,
                  lambda t: poi_kind(t) is not None and (bool(t.get("name")) or t.get("amenity") == "motorcycle_parking")
                  and not (t.get("amenity") == "parking" and not t.get("name")))
     with open(tmp, encoding="utf-8") as f:
         elements = json.load(f)["elements"]
     os.remove(tmp)
-    by_name, by_tile, count = defaultdict(list), defaultdict(list), 0
+    rows = []
     for e in elements:
         lat = e["lat"] if "lat" in e else e["center"]["lat"]
         lon = e["lon"] if "lon" in e else e["center"]["lon"]
         tags = e["tags"]
         name = tags.get("name") or tags.get("brand") or "Parkování motorek"
         kind = poi_kind(tags)
-        row = [round(lat, 5), round(lon, 5), name, kind, tags.get("addr:city") or tags.get("addr:place") or ""]
-        keys = {w[:2] for w in normalize(name + " " + tags.get("brand", "")).split()[:5] if len(w) >= 2}
-        for key in keys:
-            by_name[key].append(row)
-        by_tile[(math.floor(lon / TILE_LON), math.floor(lat / TILE_LAT))].append(row)
-        count += 1
-    os.makedirs(os.path.join(out_dir, "pois", "n"), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, "pois", "t"), exist_ok=True)
-    for key, rows in by_name.items():
-        write_bin(os.path.join(out_dir, "pois", "n", f"{key}.bin"), rows)
-    for (x, y), rows in by_tile.items():
-        write_bin(os.path.join(out_dir, "pois", "t", f"{x}_{y}.bin"), rows)
-    return count
+        rows.append([round(lat, 5), round(lon, 5), name, kind, tags.get("addr:city") or tags.get("addr:place") or "",
+                     tags.get("brand", "")])
+    return rows
+
+def write_pois(rows, out_dir, name_dir=("pois", "n"), tiles=True):
+    """Name index (name_dir/<2 letters>.bin) and, with tiles, pois/t/<x>_<y>.bin. Rows keep 5 fields in the files."""
+    by_name, by_tile = defaultdict(list), defaultdict(list)
+    for row in rows:
+        lat, lon, name = row[0], row[1], row[2]
+        brand = row[5] if len(row) > 5 else ""
+        short = row[:5]
+        if name_dir:
+            for key in {w[:2] for w in normalize(name + " " + brand).split()[:5] if len(w) >= 2}:
+                by_name[key].append(short)
+        if tiles:
+            by_tile[(math.floor(lon / TILE_LON), math.floor(lat / TILE_LAT))].append(short)
+    if name_dir:
+        os.makedirs(os.path.join(out_dir, *name_dir), exist_ok=True)
+    for key, part in by_name.items():
+        write_bin(os.path.join(out_dir, *name_dir, f"{key}.bin"), part)
+    if tiles:
+        os.makedirs(os.path.join(out_dir, "pois", "t"), exist_ok=True)
+        for (x, y), part in by_tile.items():
+            write_bin(os.path.join(out_dir, "pois", "t", f"{x}_{y}.bin"), part)
 
 def main(work, site):
     out = os.path.join(site, "v1")
