@@ -79,6 +79,30 @@ def route(frm, to, kind):
             "avg_kmh": round(r["distance"] / max(r["duration"], 1) * 3.6), "roads": top,
             "steps": steps, "segment_times": has_segment_times, "ms": round(took * 1000)}, coords
 
+def write_page(rows, features, kinds, out):
+    """Map with a route picker and the table; routes are inside the page (works opened from a file)."""
+    def cell(i):
+        return "—" if "error" in i else f"{i['distance_km']} km · {i['duration_min']} min · {i['bends']} zatáček, ⌀ {i['avg_kmh']} km/h<br><small>{', '.join(i['roads'])}</small>"
+    table = "".join(f"<tr data-name=\"{r['name']}\" style=\"cursor:pointer\"><td>{r['name']}</td>" + "".join(f"<td>{cell(r[k])}</td>" for k in kinds) + "</tr>" for r in rows)
+    # Trasy přímo ve stránce: otevřená ze souboru (dvojklikem) by si vedlejší soubor načíst nesměla.
+    geo = json.dumps({"type": "FeatureCollection", "features": [
+        dict(f, geometry=dict(f["geometry"], coordinates=[[round(x, 5), round(y, 5)] for x, y in f["geometry"]["coordinates"][::3]]))
+        for f in features]}, separators=(",", ":"))
+    html = f"""<!doctype html><meta charset=utf-8><title>MotoCesta – test Valhally</title>
+<link rel=stylesheet href=https://unpkg.com/leaflet@1.9.4/dist/leaflet.css><script src=https://unpkg.com/leaflet@1.9.4/dist/leaflet.js></script>
+<style>body{{font:14px -apple-system,Arial;margin:16px}}#map{{height:520px}}table{{border-collapse:collapse;margin-top:12px}}td,th{{border:1px solid #ddd;padding:4px 8px}}</style>
+<h1>Test Valhally – motorkářský profil</h1><p>Rychlá modře, Normální 0,0 šedě, 0,2 oranžově, 0,4 zeleně. Mapa © přispěvatelé OpenStreetMap.</p><p><label>Trasa: <select id=pick></select></label> nebo klikni na řádek tabulky.</p><div id=map></div>
+<table><tr><th>Trasa</th><th>Rychlá</th><th>Normální 0,0</th><th>Normální 0,2</th><th>Normální 0,4</th></tr>{table}</table>
+<script>const m=L.map('map').setView([49.4,17.5],7);L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap'}}).addTo(m);
+const g={geo};const colors={{fast:'#1f6fe5',normal:'#888',normal_02:'#e8590c',normal_04:'#2b8a3e'}};
+const names=[...new Set(g.features.map(f=>f.properties.name))];const sel=document.getElementById('pick');
+sel.innerHTML='<option value="">Všechny trasy</option>'+names.map(n=>`<option>${{n}}</option>`).join('');
+let layer=null;function show(name){{if(layer)m.removeLayer(layer);const fs=g.features.filter(f=>!name||f.properties.name===name);
+layer=L.geoJSON({{type:'FeatureCollection',features:fs}},{{style:f=>({{color:colors[f.properties.kind]||'#000',weight:name?5:3,opacity:0.85}})}}).bindPopup(l=>l.feature.properties.name+' · '+l.feature.properties.kind).addTo(m);
+if(fs.length)m.fitBounds(layer.getBounds(),{{padding:[20,20]}});sel.value=name;document.querySelectorAll('tr[data-name]').forEach(r=>r.style.background=r.dataset.name===name?'#fff3bf':'');}}
+sel.onchange=()=>show(sel.value);document.querySelectorAll('tr[data-name]').forEach(r=>r.onclick=()=>{{show(r.dataset.name);window.scrollTo(0,0);}});show('');</script>"""
+    open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(html)
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     here = os.path.dirname(os.path.abspath(__file__))
@@ -98,21 +122,7 @@ def main(out):
         print(json.dumps(row, ensure_ascii=False))
     json.dump({"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "routes": rows}, open(os.path.join(out, "report.json"), "w"), ensure_ascii=False, indent=1)
     json.dump({"type": "FeatureCollection", "features": features}, open(os.path.join(out, "routes.geojson"), "w"))
-    def cell(i):
-        return "—" if "error" in i else f"{i['distance_km']} km · {i['duration_min']} min · {i['bends']} zatáček, ⌀ {i['avg_kmh']} km/h<br><small>{', '.join(i['roads'])}</small>"
-    table = "".join(f"<tr><td>{r['name']}</td>" + "".join(f"<td>{cell(r[k])}</td>" for k in KINDS) + "</tr>" for r in rows)
-    # Trasy přímo ve stránce: otevřená ze souboru (dvojklikem) by si vedlejší soubor načíst nesměla.
-    geo = json.dumps({"type": "FeatureCollection", "features": [
-        dict(f, geometry=dict(f["geometry"], coordinates=[[round(x, 5), round(y, 5)] for x, y in f["geometry"]["coordinates"][::3]]))
-        for f in features]}, separators=(",", ":"))
-    html = f"""<!doctype html><meta charset=utf-8><title>MotoCesta – test Valhally</title>
-<link rel=stylesheet href=https://unpkg.com/leaflet@1.9.4/dist/leaflet.css><script src=https://unpkg.com/leaflet@1.9.4/dist/leaflet.js></script>
-<style>body{{font:14px -apple-system,Arial;margin:16px}}#map{{height:520px}}table{{border-collapse:collapse;margin-top:12px}}td,th{{border:1px solid #ddd;padding:4px 8px}}</style>
-<h1>Test Valhally – motorkářský profil</h1><p>Rychlá modře, Normální 0,0 šedě, 0,2 oranžově, 0,4 zeleně. Mapa © přispěvatelé OpenStreetMap.</p><div id=map></div>
-<table><tr><th>Trasa</th><th>Rychlá</th><th>Normální 0,0</th><th>Normální 0,2</th><th>Normální 0,4</th></tr>{table}</table>
-<script>const m=L.map('map').setView([49.4,17.5],7);L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap'}}).addTo(m);
-const g={geo};L.geoJSON(g,{{style:f=>({{color:{{fast:'#1f6fe5',normal:'#888',normal_02:'#e8590c',normal_04:'#2b8a3e'}}[f.properties.kind],weight:3}})}}).bindPopup(l=>l.feature.properties.name+' · '+l.feature.properties.kind).addTo(m);</script>"""
-    open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(html)
+    write_page(rows, features, KINDS, out)
     print(f"Hotovo: {len(rows)} tras, {failures} chyb")
     if failures > len(rows):  # more than a third of requests failed
         sys.exit("Příliš mnoho chyb – server tras nefunguje správně.")
