@@ -33,11 +33,16 @@ def inflate(path):
         return json.loads(zlib.decompress(f.read(), -15))
 
 
+HOME_TILES = set()  # road tiles CZ + SK need (kept even when the site would be too big)
+
+
 def merge_roads(parts, out):
     folder = os.path.join(out, "roads")
     os.makedirs(folder, exist_ok=True)
     count = 0
     for path in glob.glob(os.path.join(parts, "*", "roads", "*.bin")):
+        if os.path.basename(os.path.dirname(os.path.dirname(path))) in HOME:
+            HOME_TILES.add(os.path.basename(path))
         target = os.path.join(folder, os.path.basename(path))
         if os.path.exists(target):
             roads = {r["id"]: r for r in inflate(target)}
@@ -165,6 +170,14 @@ def main(parts, work, site):
                 if os.path.exists(path):
                     os.remove(path)
         print("::warning::Data přes 950 MB (%d MB) – vynecháno hledání a soubory pro zahraničí, mapa zůstává. Přejít na R2." % (size / 1e6))
+        size = folder_size(site)
+    if size > 950e6:
+        # then the speed limits abroad (road tiles only other countries need)
+        folder = os.path.join(out, "roads")
+        for name in os.listdir(folder):
+            if name not in HOME_TILES:
+                os.remove(os.path.join(folder, name))
+        print("::warning::Pořád přes 950 MB – limity v zahraničí vynechány, dokud nebude Cloudflare R2.")
         size = folder_size(site)
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "countries": stats,
             "roadTiles": road_tiles, "mapLayerTiles": tiles, "addresses": addresses, "sizeMB": round(size / 1e6),

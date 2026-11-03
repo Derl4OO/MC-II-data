@@ -4,8 +4,8 @@
     python3 scripts/region.py <cc> <work> <out> [<previous>]
 
 Expects <cc>.osm.pbf (Geofabrik) in the current folder. Writes into <out>:
-  roads/<x>_<y>.bin   speed limits and road network – only for countries whose legal rules are verified
-                      ("limits": true in config/countries.json; today CZ, SK)
+  roads/<x>_<y>.bin   speed limits and road network – for countries with legal rules in config/limits.json
+                      ("limits": true in config/countries.json)
   radars.json, fuel.json, sights.json   as in build.py, for this country
   pois.json.gz        places for search ([lat, lon, name, kind, town, brand])
   curves.json.gz      curvy road stretches ([level, [[lon, lat], …]]) for the map layer (moto_tiles.py)
@@ -57,6 +57,7 @@ def run(cc, work, out):
     osmium(pbf, ["n/highway=speed_camera"], os.path.join(work, f"cams-{cc}.opl"), locations=False)
     osmium(pbf, ["nw/amenity=fuel"], os.path.join(work, f"fuel-{cc}.opl"))
     if info.get("limits"):
+        build.set_country(cc)  # legal default limits of this country (config/limits.json)
         build.extract_urban(work)
         build.URBAN_CELLS.update(build.build_urban_cells(work))
         build.extract_city_limits(work)

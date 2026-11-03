@@ -1,23 +1,112 @@
 {
- "_info": "Země dat MotoCesty. Přidat zemi = přidat řádek (id = kód země, geofabrik = cesta na download.geofabrik.de). limits: true jen po ověření zákonných pravidel limitů.",
+ "_info": "Země dat MotoCesty. Přidat zemi = přidat řádek (id = kód země, geofabrik = cesta na download.geofabrik.de). limits: true jen když jsou v config/limits.json ověřená zákonná pravidla.",
  "countries": [
-  {"id": "cz", "name": "Česko", "geofabrik": "europe/czech-republic", "limits": true},
-  {"id": "sk", "name": "Slovensko", "geofabrik": "europe/slovakia", "limits": true},
-  {"id": "pl", "name": "Polsko", "geofabrik": "europe/poland"},
-  {"id": "de", "name": "Německo", "geofabrik": "europe/germany"},
-  {"id": "at", "name": "Rakousko", "geofabrik": "europe/austria"},
-  {"id": "hu", "name": "Maďarsko", "geofabrik": "europe/hungary"},
-  {"id": "si", "name": "Slovinsko", "geofabrik": "europe/slovenia"},
-  {"id": "hr", "name": "Chorvatsko", "geofabrik": "europe/croatia"},
-  {"id": "ch", "name": "Švýcarsko", "geofabrik": "europe/switzerland"},
-  {"id": "li", "name": "Lichtenštejnsko", "geofabrik": "europe/liechtenstein"},
-  {"id": "it", "name": "Itálie", "geofabrik": "europe/italy"},
-  {"id": "fr", "name": "Francie", "geofabrik": "europe/france"},
-  {"id": "es", "name": "Španělsko", "geofabrik": "europe/spain"},
-  {"id": "pt", "name": "Portugalsko", "geofabrik": "europe/portugal"},
-  {"id": "ad", "name": "Andorra", "geofabrik": "europe/andorra"},
-  {"id": "be", "name": "Belgie", "geofabrik": "europe/belgium"},
-  {"id": "nl", "name": "Nizozemsko", "geofabrik": "europe/netherlands"},
-  {"id": "lu", "name": "Lucembursko", "geofabrik": "europe/luxembourg"}
+  {
+   "id": "cz",
+   "name": "Česko",
+   "geofabrik": "europe/czech-republic",
+   "limits": true
+  },
+  {
+   "id": "sk",
+   "name": "Slovensko",
+   "geofabrik": "europe/slovakia",
+   "limits": true
+  },
+  {
+   "id": "pl",
+   "name": "Polsko",
+   "geofabrik": "europe/poland",
+   "limits": true
+  },
+  {
+   "id": "de",
+   "name": "Německo",
+   "geofabrik": "europe/germany",
+   "limits": true
+  },
+  {
+   "id": "at",
+   "name": "Rakousko",
+   "geofabrik": "europe/austria",
+   "limits": true
+  },
+  {
+   "id": "hu",
+   "name": "Maďarsko",
+   "geofabrik": "europe/hungary",
+   "limits": true
+  },
+  {
+   "id": "si",
+   "name": "Slovinsko",
+   "geofabrik": "europe/slovenia",
+   "limits": true
+  },
+  {
+   "id": "hr",
+   "name": "Chorvatsko",
+   "geofabrik": "europe/croatia",
+   "limits": true
+  },
+  {
+   "id": "ch",
+   "name": "Švýcarsko",
+   "geofabrik": "europe/switzerland",
+   "limits": true
+  },
+  {
+   "id": "li",
+   "name": "Lichtenštejnsko",
+   "geofabrik": "europe/liechtenstein",
+   "limits": true
+  },
+  {
+   "id": "it",
+   "name": "Itálie",
+   "geofabrik": "europe/italy",
+   "limits": true
+  },
+  {
+   "id": "fr",
+   "name": "Francie",
+   "geofabrik": "europe/france",
+   "limits": true
+  },
+  {
+   "id": "es",
+   "name": "Španělsko",
+   "geofabrik": "europe/spain",
+   "limits": true
+  },
+  {
+   "id": "pt",
+   "name": "Portugalsko",
+   "geofabrik": "europe/portugal",
+   "limits": true
+  },
+  {
+   "id": "ad",
+   "name": "Andorra",
+   "geofabrik": "europe/andorra"
+  },
+  {
+   "id": "be",
+   "name": "Belgie",
+   "geofabrik": "europe/belgium",
+   "limits": true
+  },
+  {
+   "id": "nl",
+   "name": "Nizozemsko",
+   "geofabrik": "europe/netherlands",
+   "limits": true
+  },
+  {
+   "id": "lu",
+   "name": "Lucembursko",
+   "geofabrik": "europe/luxembourg",
+   "limits": true
+  }
  ]
 }

@@ -75,11 +75,36 @@ def speed_limit(tags, kind):
         first = raw.split(" ")[0]
         if first.isdigit() and int(first) > 0:
             return int(int(first) * 1.609) if "mph" in raw else int(first)
-        if raw.endswith(":urban"): return 50
-        if raw.endswith(":rural"): return 90
-        if raw.endswith(":motorway"): return 130
+        if first == "none":
+            return None  # no general limit (German Autobahn) – the app shows no sign
+        rules = rules_for(raw)
+        if raw.endswith(":urban"): return rules.get("urban")
+        if raw.endswith(":rural"): return rules.get("rural")
+        if raw.endswith(":motorway"): return rules.get("motorway")
+        if raw.endswith(":trunk") or raw.endswith(":motorroad"): return rules.get("motorroad")
         if raw.endswith(":living_street"): return 20
-    return {"motorway": 130, "living_street": 20}.get(kind)
+    return {"motorway": RULES.get("motorway"), "living_street": 20}.get(kind)
+
+# Legal default limits of the country being built (config/limits.json; region.py sets the country).
+def _load_rules():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "limits.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)["rules"]
+    except (OSError, ValueError, KeyError):
+        return {"cz": {"urban": 50, "rural": 90, "motorroad": 110, "motorway": 130}}
+
+ALL_RULES = _load_rules()
+RULES = dict(ALL_RULES.get("cz", {}))
+
+def rules_for(raw):
+    """Rules of the country named in a tag value like "DE:rural" (the build's country otherwise)."""
+    country = raw.split(":")[0] if ":" in raw else ""
+    return ALL_RULES.get(country, RULES)
+
+def set_country(cc):
+    RULES.clear()
+    RULES.update(ALL_RULES.get(cc, {}))
 
 # --- Default (implied) limits for roads without a maxspeed tag (Czech/Slovak rules) ---
 # Most rural roads in OSM have no maxspeed; the law gives 90 outside and 50 inside built-up areas.
@@ -205,13 +230,31 @@ def is_urban(cells, lon, lat):
     cx, cy = math.floor(lon / CELL_LON), math.floor(lat / CELL_LAT)
     return any((cx + dx, cy + dy) in cells for dx in (-1, 0, 1) for dy in (-1, 0, 1))
 
-def implied_limit(tags, kind, urban):
+def implied_limit(tags, kind, urban, lat=None, lon=None):
+    """Legal default limit of the build's country (RULES). Same order as before for CZ/SK."""
     base = kind.replace("_link", "")
-    if base == "motorway": return 130
+    if base == "motorway": return RULES.get("motorway")
     if base == "living_street": return 20
-    if base == "residential": return 50
-    if base == "trunk" and tags.get("motorroad") == "yes" and not urban: return 110
-    return 50 if urban else 90
+    dual = oneway(tags, kind) != 0 and base in ("trunk", "primary")
+    if urban or base == "residential":
+        for south, west, north, east, value in RULES.get("urban_boxes", []):
+            if lat is not None and south <= lat <= north and west <= lon <= east:
+                return value
+        try:
+            lanes = int(tags.get("lanes", "0").split(";")[0])
+        except ValueError:
+            lanes = 0
+        wide = lanes >= 4 or (oneway(tags, kind) != 0 and lanes >= 2)
+        if wide and RULES.get("urban_multilane"):
+            return RULES["urban_multilane"]
+        return RULES.get("urban")
+    if tags.get("motorroad") == "yes" or base == "trunk" and RULES.get("trunk_is_motorroad"):
+        if dual and RULES.get("motorroad_dual"):
+            return RULES["motorroad_dual"]
+        return RULES.get("motorroad", RULES.get("rural"))
+    if dual and RULES.get("rural_dual"):
+        return RULES["rural_dual"]
+    return RULES.get("rural")
 
 URBAN_CELLS = set()
 # Quality check written to meta.json: road pieces with a posted limit, with a default limit, and without any.
@@ -266,7 +309,7 @@ def build_roads(files, out_dir):
                     pieces, start = [], 0
                     for i in range(1, len(nodes)):
                         if i == len(nodes) - 1 or flags[i] != flags[start]:
-                            pieces.append((start, i, implied_limit(tags, kind, flags[start])))
+                            pieces.append((start, i, implied_limit(tags, kind, flags[start], lats[start], lons[start])))
                             start = i
                 for k, (a, b, piece_limit) in enumerate(pieces):
                     pid = wid if len(pieces) == 1 else wid * 100 + k

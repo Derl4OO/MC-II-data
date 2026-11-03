@@ -1,0 +1,22 @@
+{
+ "_info": "Zákonné limity (km/h) tam, kde silnice nemá zapsaný limit. Motocykly mají ve všech těchto zemích stejné obecné limity jako osobní auta. Zdroj čísel: Evropská komise, Your Europe – Road rules and safety (stránka každé země, převzato 3. 11. 2026) a uvedený zákon. null = bez obecného limitu (DE dálnice) nebo neurčeno (pak se limit ukáže jen tam, kde je zapsaný v OSM). urban_multilane = ve městě silnice se 2+ pruhy v jednom směru (ES), rural_dual = mimo obec silnice s oddělenými jízdními pásy, motorroad = silnice pro motorová vozidla / rychlostní silnice, motorroad_dual = totéž se 2 pásy (PL).",
+ "rules": {
+  "cz": {"urban": 50, "rural": 90, "motorroad": 110, "motorway": 130, "law": "zákon 361/2000 Sb. § 18"},
+  "sk": {"urban": 50, "rural": 90, "motorroad": 130, "motorway": 130, "law": "zákon 8/2009 Z. z. § 16"},
+  "pl": {"urban": 50, "rural": 90, "rural_dual": 100, "motorroad": 100, "motorroad_dual": 120, "motorway": 140, "law": "Prawo o ruchu drogowym, art. 20"},
+  "de": {"urban": 50, "rural": 100, "motorroad": 100, "motorway": null, "advisory_motorway": 130, "law": "StVO § 3; Autobahn bez obecného limitu (doporučeno 130)"},
+  "at": {"urban": 50, "rural": 100, "motorroad": 130, "motorway": 130, "law": "StVO 1960 § 20"},
+  "hu": {"urban": 50, "rural": 90, "motorroad": 110, "motorway": 130, "law": "KRESZ 1/1975 KPM-BM, § 26"},
+  "si": {"urban": 50, "rural": 90, "motorroad": 110, "motorway": 130, "law": "Zakon o pravilih cestnega prometa, čl. 46"},
+  "hr": {"urban": 50, "rural": 90, "motorroad": 110, "motorway": 130, "law": "Zakon o sigurnosti prometa na cestama, čl. 53"},
+  "ch": {"urban": 50, "rural": 80, "motorroad": 100, "motorway": 120, "law": "Verkehrsregelnverordnung (VRV) Art. 4a"},
+  "li": {"urban": 50, "rural": 80, "motorroad": 80, "motorway": 80, "law": "Verkehrsregelnverordnung (VRV) Art. 4a, LGBl."},
+  "it": {"urban": 50, "rural": 90, "rural_dual": 110, "motorroad": 110, "motorway": 130, "law": "Codice della strada, art. 142 (déšť: dálnice 110, hlavní silnice 90)"},
+  "fr": {"urban": 50, "rural": 80, "rural_dual": 110, "motorroad": 110, "motorway": 130, "law": "Code de la route, art. R413-2 (déšť: dálnice 110, 110→100, 90→80); departementy mohou mít 90 – v OSM zapsané"},
+  "es": {"urban": 30, "urban_multilane": 50, "rural": 90, "motorroad": 120, "motorway": 120, "law": "Reglamento General de Circulación, art. 48 a 50"},
+  "pt": {"urban": 50, "rural": 90, "motorroad": 100, "motorway": 120, "law": "Código da Estrada, art. 27"},
+  "be": {"urban": 50, "rural": null, "motorroad": 120, "motorway": 120, "urban_boxes": [[50.76, 4.24, 50.92, 4.48, 30]], "law": "Code de la route / Wegcode art. 11 (mimo obec Flandry 70, Valonsko a Brusel 90 – podle regionu, zatím jen zapsané limity; Brusel ve městě 30)"},
+  "nl": {"urban": 50, "rural": 80, "motorroad": 100, "motorway": 100, "law": "RVV 1990 art. 20, 21 (dálnice přes den 100, v noci 120/130 jen kde je zapsáno)"},
+  "lu": {"urban": 50, "rural": 90, "motorroad": 90, "motorway": 130, "law": "Code de la route, art. 139 (déšť: dálnice 110)"}
+ }
+}
