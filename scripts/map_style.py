@@ -74,6 +74,41 @@ def road(layer_id, classes, color, line_width, minzoom=0, dash=None):
             "layout": {"line-cap": "round", "line-join": "round"}, "paint": paint}
 
 
+# Looks approved for the preview 3. 11. 2026 (Julien + Codex + Claude): Moto Light for planning, Topo Touring
+# for browsing a trip (stronger hills and curves), Rider Focus for riding (calm, big, few labels). Day light, night dark.
+_LIGHT = {"background": "#f4f2ec", "wood": "#dbe6d1", "grass": "#e4ecd9", "residential": "#eeeae2", "farmland": "#f4f2ec",
+          "industrial": "#ebe8e2", "cemetery": "#dfe8d6", "wetland": "#dfe9e0", "water": "#d3e5ea", "waterway": "#b3d3de",
+          "building": "#e6e1d8", "outline": "#d8d1c4", "motorway": "#ead9c0", "motorway_case": "#cdb795",
+          "trunk": "#ffffff", "secondary": "#ffffff", "major": "#ffffff", "major_case": "#c9c3b8", "minor": "#ffffff",
+          "minor_case": "#dbd5ca", "tunnel": "#e4dfd6", "rail": "#c9c4bb", "boundary": "#a79cb6",
+          "label": "#2a2722", "label_soft": "#6b665c", "halo": "#f4f2ec", "water_label": "#3f6f86", "peak": "#7a6a55",
+          "poi": "#d9733a", "poi_stroke": "#ffffff", "protected": "#7c9a6a",
+          "curve1": "#c7704f", "curve2": "#b0402e", "curve_opacity": 0.3, "shadow": "#8a7a65", "highlight": "#fffaf0", "hillshade": 0.22}
+_DARK = {"background": "#1f221e", "wood": "#252c23", "grass": "#252b22", "residential": "#292a26", "farmland": "#20231f",
+         "industrial": "#2a2a27", "cemetery": "#242b22", "wetland": "#212925", "water": "#1b2a31", "waterway": "#264150",
+         "building": "#30312c", "outline": "#3a3b35", "motorway": "#6b5c48", "motorway_case": "#141612",
+         "trunk": "#a7a99f", "secondary": "#959990", "major": "#8f948a", "major_case": "#141612", "minor": "#6b7066",
+         "minor_case": "#141612", "tunnel": "#3a3d36", "rail": "#4a4d46", "boundary": "#7d6e8c",
+         "label": "#ece7dc", "label_soft": "#b5ae9f", "halo": "#1f221e", "water_label": "#86a8bd", "peak": "#c9a27a",
+         "poi": "#e07a3f", "poi_stroke": "#1f221e", "protected": "#5f8a52",
+         "curve1": "#d9873a", "curve2": "#c9302c", "curve_opacity": 0.35, "shadow": "#000000", "highlight": "#3a342c", "hillshade": 0.2}
+_FOCUS_HIDE = ["poi-rider-name", "places", "protected-line", "protected-name", "peak", "pass", "building", "wetland",
+               "cemetery", "industrial", "curves-1", "curves-2", "oneway", "water-name"]
+LOOKS = {
+    "moto-light": ("Moto Light – plánování", {"day": _LIGHT, "night": _DARK}, 1.0),
+    "topo-touring": ("Topo Touring – prohlížení výletu (kopce a zatáčky výrazněji)",
+                     {"day": dict(_LIGHT, hillshade=0.45, curve_opacity=0.5), "night": dict(_DARK, hillshade=0.35, curve_opacity=0.5)}, 1.0),
+    "rider-focus": ("Rider Focus – navigace (klidná, velká, málo popisků)",
+                    {"day": dict(_LIGHT, major_case="#a39d90", minor_case="#c6c0b4", hillshade=0.12, hide=_FOCUS_HIDE),
+                     "night": dict(_DARK, trunk="#c4c6bc", secondary="#b1b4aa", major="#a6aaa0", hillshade=0.12, hide=_FOCUS_HIDE)}, 1.25),
+}
+
+
+def build_look(look, name):
+    _, palettes, scale = LOOKS[look]
+    return build(name, palettes[name], scale)
+
+
 def build(name, palette=None, scale=1.0):
     """palette/scale: other looks for the preview page (variants to choose from)."""
     p = dict(PALETTES[name], **(palette or {}))
@@ -180,6 +215,8 @@ def _build(name, p):
     ]
     if p.get("extras", True):
         tune(layers, p, major_w, minor_w, name)
+    hidden = set(p.get("hide", []))
+    layers[:] = [layer for layer in layers if layer["id"] not in hidden]
     style = {"version": 8, "name": f"MotoCesta {name}", "glyphs": GLYPHS,
              "sources": {"omt": {"type": "vector", "url": TILES, "attribution": ATTRIBUTION}},
              "layers": layers}
@@ -232,7 +269,7 @@ def tune(layers, p, major_w, minor_w, name):
     # Flat hill shading (Julien 3. 11.: ok if not 3D terrain), soft and warm.
     after("protected-line",
           {"id": "hillshade", "type": "hillshade", "source": "dem", "maxzoom": 16,
-           "paint": {"hillshade-exaggeration": 0.3 if name == "day" else 0.22, "hillshade-shadow-color": p["shadow"],
+           "paint": {"hillshade-exaggeration": p.get("hillshade", 0.3 if name == "day" else 0.22), "hillshade-shadow-color": p["shadow"],
                      "hillshade-highlight-color": p["highlight"], "hillshade-accent-color": p["shadow"],
                      "hillshade-illumination-anchor": "map"}})
     # Curvy roads: a glow under the road, light orange (l=1) and sharper red (l=2), as approved 3. 11.
@@ -240,10 +277,10 @@ def tune(layers, p, major_w, minor_w, name):
     after("tunnel",
           {"id": "curves-1", "type": "line", "source": "moto", "source-layer": "curves", "filter": ["==", ["get", "l"], 1],
            "layout": {"line-cap": "round", "line-join": "round"},
-           "paint": {"line-color": p["curve1"], "line-width": glow, "line-opacity": 0.55, "line-blur": 1.5}},
+           "paint": {"line-color": p["curve1"], "line-width": glow, "line-opacity": p.get("curve_opacity", 0.55), "line-blur": 1.5}},
           {"id": "curves-2", "type": "line", "source": "moto", "source-layer": "curves", "filter": ["==", ["get", "l"], 2],
            "layout": {"line-cap": "round", "line-join": "round"},
-           "paint": {"line-color": p["curve2"], "line-width": glow, "line-opacity": 0.6, "line-blur": 1.5}})
+           "paint": {"line-color": p["curve2"], "line-width": glow, "line-opacity": p.get("curve_opacity", 0.6), "line-blur": 1.5}})
     # Bridges: a darker edge, so they read as bridges when close.
     road_colors = ["match", ["get", "class"], ["trunk", "primary"], p["trunk"], "secondary", p["secondary"],
                    "motorway", p["motorway"], ["minor", "service"], p["minor"], p["major"]]
@@ -290,6 +327,11 @@ def main(out):
     for name in PALETTES:
         with open(os.path.join(folder, f"{name}.json"), "w", encoding="utf-8") as f:
             json.dump(build(name), f, ensure_ascii=False, separators=(",", ":"))
+    # the new looks too (v1/style/<look>-day.json …), the apps switch to them after approval
+    for look in LOOKS:
+        for name in PALETTES:
+            with open(os.path.join(folder, f"{look}-{name}.json"), "w", encoding="utf-8") as f:
+                json.dump(build_look(look, name), f, ensure_ascii=False, separators=(",", ":"))
     assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "style-assets")
     for file in ("sprite.png", "sprite.json", "sprite@2x.png", "sprite@2x.json"):
         shutil.copy(os.path.join(assets, file), os.path.join(folder, file))
