@@ -95,6 +95,11 @@ def main(parts, work, site):
     print("Země:", ", ".join(countries))
 
     road_tiles = merge_roads(parts, out)
+    # Addresses abroad from OSM: v1/addr/<cc>/<3 letters>.bin (CZ stays v1/addr/… from RÚIAN).
+    for cc in countries:
+        source = os.path.join(parts, cc, "addr")
+        if os.path.isdir(source):
+            shutil.copytree(source, os.path.join(out, "addr", cc), dirs_exist_ok=True)
     # Whole-file data: CZ + SK as today, every country also on its own.
     for name, key in (("radars", "elements"), ("fuel", "elements"), ("sights", "sights")):
         os.makedirs(os.path.join(out, name), exist_ok=True)
@@ -165,6 +170,7 @@ def main(parts, work, site):
             if cc in HOME:
                 continue
             shutil.rmtree(os.path.join(out, "pois", "n", cc), ignore_errors=True)
+            shutil.rmtree(os.path.join(out, "addr", cc), ignore_errors=True)
             for name in ("radars", "fuel", "sights"):
                 path = os.path.join(out, name, f"{cc}.json")
                 if os.path.exists(path):

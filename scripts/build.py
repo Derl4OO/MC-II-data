@@ -105,6 +105,66 @@ def rules_for(raw):
 def set_country(cc):
     RULES.clear()
     RULES.update(ALL_RULES.get(cc, {}))
+    REGION_CELLS.clear()
+
+# --- Regions with their own default limits (rules "regions": {"BE-VLG": {...}}) ---
+# Region borders come from OSM admin boundaries (ISO3166-2), rasterised into ~500 m cells.
+REGION_CELL = 0.005
+REGION_CELLS = {}
+
+def load_regions(geojson_path):
+    """Fills REGION_CELLS from an osmium export of the country's admin_level=4 boundaries."""
+    wanted = RULES.get("regions", {})
+    if not wanted:
+        return 0
+    with open(geojson_path, encoding="utf-8") as f:
+        features = json.load(f)["features"]
+    for feature in features:
+        code = feature.get("properties", {}).get("ISO3166-2")
+        geometry = feature.get("geometry") or {}
+        if code not in wanted or geometry.get("type") not in ("Polygon", "MultiPolygon"):
+            continue
+        polygons = [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+        for polygon in polygons:
+            outer = polygon[0]
+            lons = [p[0] for p in outer]; lats = [p[1] for p in outer]
+            for cy in range(math.floor(min(lats) / REGION_CELL), math.floor(max(lats) / REGION_CELL) + 1):
+                py = (cy + 0.5) * REGION_CELL
+                xs = []
+                for ring in polygon:  # holes subtract themselves by the even-odd rule
+                    xs += [xi + (py - yi) * (xj - xi) / (yj - yi)
+                           for (xi, yi), (xj, yj) in zip(ring, ring[1:]) if (yi > py) != (yj > py)]
+                xs.sort()
+                for k in range(0, len(xs) - 1, 2):
+                    for cx in range(math.floor(xs[k] / REGION_CELL - 0.5) + 1, math.floor(xs[k + 1] / REGION_CELL - 0.5) + 1):
+                        REGION_CELLS[(cx, cy)] = code
+    return len(REGION_CELLS)
+
+def region_rules(lat, lon):
+    if lat is None or not REGION_CELLS:
+        return RULES
+    code = REGION_CELLS.get((math.floor(lon / REGION_CELL), math.floor(lat / REGION_CELL)))
+    return dict(RULES, **RULES["regions"][code]) if code else RULES
+
+# --- Conditional limits: "maxspeed:conditional" (time of day, wet road) and the law's wet-road limits ---
+COND_RE = re.compile(r"(\d+)\s*@\s*\(?([^;)]*)\)?")
+
+def conditional_limits(tags, limit):
+    """{"wet": 110, "times": [[130, "19:00-06:00"]]} for the road piece (only what differs from limit)."""
+    extra, times = {}, []
+    for value, condition in COND_RE.findall(tags.get("maxspeed:conditional", "")):
+        condition = condition.strip().lower()
+        if condition == "wet":
+            extra["wet"] = int(value)
+        elif re.match(r"^\d{1,2}:\d{2}-\d{1,2}:\d{2}$", condition):
+            times.append([int(value), condition])
+    if "wet" not in extra and limit:
+        wet = RULES.get("wet", {}).get(str(limit))
+        if wet:  # only fast limits have a wet value (FR 130→110, 110→100, 90→80; IT; LU)
+            extra["wet"] = wet
+    if times:
+        extra["times"] = times
+    return extra
 
 # --- Default (implied) limits for roads without a maxspeed tag (Czech/Slovak rules) ---
 # Most rural roads in OSM have no maxspeed; the law gives 90 outside and 50 inside built-up areas.
@@ -231,30 +291,29 @@ def is_urban(cells, lon, lat):
     return any((cx + dx, cy + dy) in cells for dx in (-1, 0, 1) for dy in (-1, 0, 1))
 
 def implied_limit(tags, kind, urban, lat=None, lon=None):
-    """Legal default limit of the build's country (RULES). Same order as before for CZ/SK."""
+    """Legal default limit of the build's country (RULES), with the region's own rules where they differ
+    (Belgium: Flanders / Wallonia / Brussels). Same order as before for CZ/SK."""
+    rules = region_rules(lat, lon)
     base = kind.replace("_link", "")
-    if base == "motorway": return RULES.get("motorway")
+    if base == "motorway": return rules.get("motorway")
     if base == "living_street": return 20
     dual = oneway(tags, kind) != 0 and base in ("trunk", "primary")
     if urban or base == "residential":
-        for south, west, north, east, value in RULES.get("urban_boxes", []):
-            if lat is not None and south <= lat <= north and west <= lon <= east:
-                return value
         try:
             lanes = int(tags.get("lanes", "0").split(";")[0])
         except ValueError:
             lanes = 0
         wide = lanes >= 4 or (oneway(tags, kind) != 0 and lanes >= 2)
-        if wide and RULES.get("urban_multilane"):
-            return RULES["urban_multilane"]
-        return RULES.get("urban")
-    if tags.get("motorroad") == "yes" or base == "trunk" and RULES.get("trunk_is_motorroad"):
-        if dual and RULES.get("motorroad_dual"):
-            return RULES["motorroad_dual"]
-        return RULES.get("motorroad", RULES.get("rural"))
-    if dual and RULES.get("rural_dual"):
-        return RULES["rural_dual"]
-    return RULES.get("rural")
+        if wide and rules.get("urban_multilane"):
+            return rules["urban_multilane"]
+        return rules.get("urban")
+    if tags.get("motorroad") == "yes" or base == "trunk" and rules.get("trunk_is_motorroad"):
+        if dual and rules.get("motorroad_dual"):
+            return rules["motorroad_dual"]
+        return rules.get("motorroad", rules.get("rural"))
+    if dual and rules.get("rural_dual"):
+        return rules["rural_dual"]
+    return rules.get("rural")
 
 URBAN_CELLS = set()
 # Quality check written to meta.json: road pieces with a posted limit, with a default limit, and without any.
@@ -317,6 +376,8 @@ def build_roads(files, out_dir):
                              "kind": kind, "limit": piece_limit, "oneway": oneway(tags, kind)}
                     if signed:
                         piece["signed"] = True  # JSON true (Swift Bool decodes only true/false)
+                    # Wet road / time of day (apps use it when it rains, from the weather they already load).
+                    piece.update(conditional_limits(tags, piece_limit))
                     LIMIT_STATS["none" if piece_limit is None else "signed" if signed else "implied"] += 1
                     road = json.dumps(piece, separators=(",", ":"))
                     for key in tiles_for(lats[a:b + 1], lons[a:b + 1]):

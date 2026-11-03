@@ -23,8 +23,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build  # noqa: E402
 import moto_tiles  # noqa: E402
+import osm_addresses  # noqa: E402
 
-CHECKED = ("pois", "sights", "fuel", "curvesKm", "roads")
+CHECKED = ("pois", "sights", "fuel", "curvesKm", "roads", "addresses")
 DROP = 0.6  # a count below 60 % of the previous build means broken input data
 
 
@@ -58,6 +59,12 @@ def run(cc, work, out):
     osmium(pbf, ["nw/amenity=fuel"], os.path.join(work, f"fuel-{cc}.opl"))
     if info.get("limits"):
         build.set_country(cc)  # legal default limits of this country (config/limits.json)
+        if build.RULES.get("regions"):
+            # regions with their own default limits (Belgium): admin boundaries as polygons
+            subprocess.run(["osmium", "tags-filter", pbf, "r/admin_level=4", "-o", os.path.join(work, "regions.pbf"), "--overwrite"], check=True)
+            subprocess.run(["osmium", "export", os.path.join(work, "regions.pbf"), "-o", os.path.join(work, "regions.geojson"),
+                            "--geometry-types=polygon", "--overwrite"], check=True)
+            stats["regionCells"] = build.load_regions(os.path.join(work, "regions.geojson"))
         build.extract_urban(work)
         build.URBAN_CELLS.update(build.build_urban_cells(work))
         build.extract_city_limits(work)
@@ -75,6 +82,10 @@ def run(cc, work, out):
     with gzip.open(os.path.join(out, "pois.json.gz"), "wt", encoding="utf-8") as f:
         json.dump(rows, f, ensure_ascii=False, separators=(",", ":"))
     stats["pois"] = len(rows)
+    if cc != "cz":  # CZ has the complete RÚIAN (merge.py); elsewhere addresses from OSM, offline and storable
+        osmium(pbf, ["nw/addr:housenumber", "nw/addr:conscriptionnumber"], os.path.join(work, f"addr-{cc}.opl"))
+        stats["addresses"] = osm_addresses.build_addresses(os.path.join(work, f"addr-{cc}.opl"), out)
+        os.remove(os.path.join(work, f"addr-{cc}.opl"))
     runs = moto_tiles.read_curves(work)
     with gzip.open(os.path.join(out, "curves.json.gz"), "wt") as f:
         json.dump([[level, [[round(x, 5), round(y, 5)] for x, y in coords]] for level, coords in runs], f, separators=(",", ":"))
