@@ -75,6 +75,10 @@ jobs:
     if: ${{ !cancelled() && needs.setup.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    env:
+      # Cloudflare R2 (see Tools/R2-postup.md); without these secrets everything goes only to GitHub Pages.
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -84,7 +88,19 @@ jobs:
       - name: Složky zemí
         run: cd parts && for d in part-*; do mv "$d" "${d#part-}"; done && ls
       - name: Spojení a sestavení webu
-        run: python3 scripts/merge.py parts work site
+        run: python3 scripts/merge.py parts work site pages
+      - name: Nahrání všech dat do Cloudflare R2
+        if: ${{ env.R2_BUCKET != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 sync site/v1 "s3://$R2_BUCKET/v1" --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" --size-only --delete --only-show-errors
+          # small files that may change without changing size: always upload
+          E="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          for f in meta.json config.json; do aws s3 cp "site/v1/$f" "s3://$R2_BUCKET/v1/$f" --endpoint-url "$E" --only-show-errors; done
+          aws s3 sync site/v1/style "s3://$R2_BUCKET/v1/style" --endpoint-url "$E" --exact-timestamps --only-show-errors
       - name: Upozornění na problém (GitHub issue → e-mail)
         if: ${{ hashFiles('problems.md') != '' }}
         env:
@@ -93,7 +109,7 @@ jobs:
           gh issue create --repo "$GITHUB_REPOSITORY" --title "Data MotoCesta – kontrola našla problém" --body-file problems.md
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: pages
 
   deploy:
     needs: site

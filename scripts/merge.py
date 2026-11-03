@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Joins the per-country builds (region.py) into the published site (Tools/data.yml, job "site").
 
-    python3 scripts/merge.py <parts> <work> <site>
+    python3 scripts/merge.py <parts> <work> <site> [<pages>]
+
+<site> = all data (Cloudflare R2), <pages> = the copy for GitHub Pages, shortened to 1 GB if needed.
 
 <parts>/<cc>/ are the countries. Output <site>/v1/ keeps the paths the apps already use:
   roads/…               countries with verified limits (tiles on a border are joined)
@@ -66,7 +68,7 @@ def read_json(path, default):
         return default
 
 
-def report_problems(stats, countries, size):
+def report_problems(stats, countries, size, pages_size=0):
     """problems.md in the current folder when something needs a look; the workflow then opens a GitHub issue
     (GitHub e-mails the repository owner). Julien 3. 11.: a drop in the data must reach us."""
     here = os.path.dirname(os.path.abspath(__file__))
@@ -78,7 +80,9 @@ def report_problems(stats, countries, size):
         elif stats.get(cc, {}).get("kept"):
             lines.append(f"- **{cc}**: data vypadala špatně ({'; '.join(stats[cc].get('problems', []))}), zůstává minulá verze.")
     if size > 900e6:
-        lines.append(f"- Data mají {round(size / 1e6)} MB, limit GitHub Pages je 1 GB – přejít na Cloudflare R2.")
+        lines.append(f"- Data mají {round(size / 1e6)} MB, limit GitHub Pages je 1 GB – přejít na Cloudflare R2 (zahraniční data se na Pages zkrátila).")
+    if pages_size > 990e6:
+        lines.append(f"- I zkrácená data pro GitHub Pages mají {round(pages_size / 1e6)} MB – nasazení může selhat.")
     if lines:
         with open("problems.md", "w", encoding="utf-8") as f:
             f.write("Kontrola dat MotoCesty našla problém (" + time.strftime("%d. %m. %Y") + "):\n\n" + "\n".join(lines)
@@ -86,7 +90,37 @@ def report_problems(stats, countries, size):
         print("::warning::" + " | ".join(lines))
 
 
-def main(parts, work, site):
+def trim_for_pages(site, pages, countries):
+    """Copy for GitHub Pages (at most 1 GB). The full data go to Cloudflare R2 when it is set up; Pages keeps
+    what today's apps use: first the extras for abroad go (name search, addresses, whole files per foreign
+    country), then the speed limits abroad. The map layer stays."""
+    shutil.rmtree(pages, ignore_errors=True)
+    shutil.copytree(site, pages)
+    out = os.path.join(pages, "v1")
+    size = folder_size(pages)
+    if size > 950e6:
+        for cc in countries:
+            if cc in HOME:
+                continue
+            shutil.rmtree(os.path.join(out, "pois", "n", cc), ignore_errors=True)
+            shutil.rmtree(os.path.join(out, "addr", cc), ignore_errors=True)
+            for name in ("radars", "fuel", "sights"):
+                path = os.path.join(out, name, f"{cc}.json")
+                if os.path.exists(path):
+                    os.remove(path)
+        size = folder_size(pages)
+        print("::warning::GitHub Pages: vynecháno hledání a soubory pro zahraničí (%d MB)." % (size / 1e6))
+    if size > 950e6:
+        folder = os.path.join(out, "roads")
+        for name in os.listdir(folder):
+            if name not in HOME_TILES:
+                os.remove(os.path.join(folder, name))
+        size = folder_size(pages)
+        print("::warning::GitHub Pages: vynechány i limity v zahraničí (%d MB)." % (size / 1e6))
+    return size
+
+
+def main(parts, work, site, pages=None):
     out = os.path.join(site, "v1")
     os.makedirs(out, exist_ok=True)
     os.makedirs(work, exist_ok=True)
@@ -163,28 +197,6 @@ def main(parts, work, site):
         print("::warning::Adresy RÚIAN selhaly:", error)
 
     size = folder_size(site)
-    # GitHub Pages takes at most 1 GB: until the data move to Cloudflare R2, the extras for abroad that
-    # today's apps do not use yet go first (name search and whole files per foreign country).
-    if size > 950e6:
-        for cc in countries:
-            if cc in HOME:
-                continue
-            shutil.rmtree(os.path.join(out, "pois", "n", cc), ignore_errors=True)
-            shutil.rmtree(os.path.join(out, "addr", cc), ignore_errors=True)
-            for name in ("radars", "fuel", "sights"):
-                path = os.path.join(out, name, f"{cc}.json")
-                if os.path.exists(path):
-                    os.remove(path)
-        print("::warning::Data přes 950 MB (%d MB) – vynecháno hledání a soubory pro zahraničí, mapa zůstává. Přejít na R2." % (size / 1e6))
-        size = folder_size(site)
-    if size > 950e6:
-        # then the speed limits abroad (road tiles only other countries need)
-        folder = os.path.join(out, "roads")
-        for name in os.listdir(folder):
-            if name not in HOME_TILES:
-                os.remove(os.path.join(folder, name))
-        print("::warning::Pořád přes 950 MB – limity v zahraničí vynechány, dokud nebude Cloudflare R2.")
-        size = folder_size(site)
     meta = {"generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "countries": stats,
             "roadTiles": road_tiles, "mapLayerTiles": tiles, "addresses": addresses, "sizeMB": round(size / 1e6),
             "license": "© OpenStreetMap contributors, ODbL 1.0", "addressLicense": "RÚIAN © ČÚZK, CC BY 4.0"}
@@ -200,12 +212,11 @@ def main(parts, work, site):
                 "<p>Data © <a href='https://www.openstreetmap.org/copyright'>přispěvatelé OpenStreetMap</a>, ODbL.</p>"
                 f"<pre>{json.dumps(meta, indent=1, ensure_ascii=False)}</pre>")
     print(json.dumps(meta, indent=1, ensure_ascii=False))
-    report_problems(stats, countries, size)
-    if size > 900e6:
-        print("::warning::Data mají %d MB – blíží se limit GitHub Pages (1 GB). Je čas přejít na Cloudflare R2." % (size / 1e6))
+    pages_size = trim_for_pages(site, pages, countries) if pages else size
+    report_problems(stats, countries, size if not os.environ.get("R2_BUCKET") else 0, pages_size)
     if meta["roads"] == 0 or meta["speedCameras"] == 0 or meta["fuelStations"] == 0:
         sys.exit("Data pro Česko a Slovensko chybí – nasazení zastaveno.")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+    main(*sys.argv[1:5])
