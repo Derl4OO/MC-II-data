@@ -1,0 +1,37 @@
+# Zkopíruj do .github/workflows/valhalla-test.yml (workflows upravuje jen Julien).
+# Sestaví server tras Valhalla pro ČR a SK a spočítá testovací trasy. Výsledek: Actions → běh → Artifacts → valhalla-report.
+name: Test Valhally (trasy)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stažení OpenStreetMap (Geofabrik)
+        run: |
+          mkdir -p vh
+          curl -sSfL -o vh/czech-republic.osm.pbf https://download.geofabrik.de/europe/czech-republic-latest.osm.pbf
+          curl -sSfL -o vh/slovakia.osm.pbf https://download.geofabrik.de/europe/slovakia-latest.osm.pbf
+          df -h .
+      - name: Sestavení a spuštění Valhally
+        run: |
+          docker run -d --name valhalla -p 8002:8002 -v "$PWD/vh:/custom_files" \
+            -e build_elevation=False -e build_admins=True -e build_time_zones=True -e serve_tiles=True \
+            ghcr.io/valhalla/valhalla-scripted:latest
+          for i in $(seq 1 360); do
+            if curl -sf http://localhost:8002/status >/dev/null; then echo "Valhalla běží po $((i*20)) s"; break; fi
+            sleep 20
+          done
+          curl -sf http://localhost:8002/status || (docker logs --tail 200 valhalla; exit 1)
+          du -sh vh; df -h .
+      - name: Testovací trasy
+        run: python3 scripts/valhalla_test.py valhalla-report
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: valhalla-report
+          path: valhalla-report
