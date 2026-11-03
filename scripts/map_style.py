@@ -102,7 +102,7 @@ _DARK = {"background": "#211f1b", "wood": "#262c21", "grass": "#262b20", "reside
          "poi": "#e8843f", "poi_stroke": "#211f1b", "protected": "#5f8a52",
          "curve1": "#d9873a", "curve2": "#c9302c", "curve_opacity": 0.35, "shadow": "#000000", "highlight": "#3a342c", "hillshade": 0.2}
 _FOCUS_HIDE = ["poi-rider-name", "places", "protected-line", "protected-name", "peak", "pass", "building", "wetland",
-               "cemetery", "industrial", "curves-1", "curves-2", "oneway", "water-name"]
+               "cemetery", "industrial", "oneway", "water-name"]
 LOOKS = {
     "moto-light": ("Moto Light – plánování", {"day": _LIGHT, "night": _DARK}, 1.0),
     "topo-touring": ("Topo Touring – prohlížení výletu (kopce a zatáčky výrazněji)",
@@ -307,11 +307,15 @@ def tune(layers, p, major_w, minor_w, name):
                       "icon-allow-overlap": True, "icon-size": 0.9}})
     # Our places from MC-II-data (castles, ruins, viewpoints, waterfalls, motorests).
     after("poi-rider-name",
-          {"id": "places", "type": "symbol", "source": "moto", "source-layer": "places", "minzoom": 10,
+          {"id": "places", "type": "symbol", "source": "moto", "source-layer": "places", "minzoom": 9.5,
            "layout": {"icon-image": ["concat", ["get", "k"], f"-{name}"], "icon-size": width([(10, 0.7), (16, 1.05)]),
                       "text-field": ["step", ["zoom"], "", 13, ["get", "n"]], "text-font": REGULAR, "text-size": 12,
                       "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": True, "text-max-width": 9},
-           "paint": {"text-color": p["label_soft"], "text-halo-color": p["halo"], "text-halo-width": 1.5}})
+           # Fade in with zoom, not a jump: places to visit from 10, motorests from 13 (Julien 3. 11.).
+           "paint": {"text-color": p["label_soft"], "text-halo-color": p["halo"], "text-halo-width": 1.5,
+                     "icon-opacity": ["interpolate", ["linear"], ["zoom"], 9.5, 0, 10.3, ["case", ["==", ["get", "k"], "motorest"], 0, 1],
+                                      12.5, ["case", ["==", ["get", "k"], "motorest"], 0, 1], 13.3, 1],
+                     "text-opacity": ["interpolate", ["linear"], ["zoom"], 12.6, 0, 13.3, 1]}})
     # Road numbers in shields (main roads yellow, others white) and icons for fuel and cafés.
     for layer in layers:
         if layer["id"] == "road-ref":
@@ -324,7 +328,8 @@ def tune(layers, p, major_w, minor_w, name):
         if layer["id"] == "poi-rider":
             layer.update({"type": "symbol", "layout": {
                 "icon-image": ["concat", ["get", "class"], f"-{name}"], "icon-size": width([(13, 0.75), (17, 1.1)]),
-                "icon-allow-overlap": True}, "paint": {}})
+                "icon-allow-overlap": True},
+                "paint": {"icon-opacity": ["interpolate", ["linear"], ["zoom"], 12.5, 0, 13.3, 1]}, "minzoom": 12.5})
     for layer in layers:
         if layer["id"].startswith("place-"):
             layer["layout"]["symbol-sort-key"] = ["coalesce", ["get", "rank"], 99]
