@@ -101,13 +101,17 @@ def main(out):
     def cell(i):
         return "—" if "error" in i else f"{i['distance_km']} km · {i['duration_min']} min · {i['bends']} zatáček, ⌀ {i['avg_kmh']} km/h<br><small>{', '.join(i['roads'])}</small>"
     table = "".join(f"<tr><td>{r['name']}</td>" + "".join(f"<td>{cell(r[k])}</td>" for k in KINDS) + "</tr>" for r in rows)
+    # Trasy přímo ve stránce: otevřená ze souboru (dvojklikem) by si vedlejší soubor načíst nesměla.
+    geo = json.dumps({"type": "FeatureCollection", "features": [
+        dict(f, geometry=dict(f["geometry"], coordinates=[[round(x, 5), round(y, 5)] for x, y in f["geometry"]["coordinates"][::3]]))
+        for f in features]}, separators=(",", ":"))
     html = f"""<!doctype html><meta charset=utf-8><title>MotoCesta – test Valhally</title>
 <link rel=stylesheet href=https://unpkg.com/leaflet@1.9.4/dist/leaflet.css><script src=https://unpkg.com/leaflet@1.9.4/dist/leaflet.js></script>
 <style>body{{font:14px -apple-system,Arial;margin:16px}}#map{{height:520px}}table{{border-collapse:collapse;margin-top:12px}}td,th{{border:1px solid #ddd;padding:4px 8px}}</style>
 <h1>Test Valhally – motorkářský profil</h1><p>Rychlá modře, Normální 0,0 šedě, 0,2 oranžově, 0,4 zeleně. Mapa © přispěvatelé OpenStreetMap.</p><div id=map></div>
 <table><tr><th>Trasa</th><th>Rychlá</th><th>Normální 0,0</th><th>Normální 0,2</th><th>Normální 0,4</th></tr>{table}</table>
 <script>const m=L.map('map').setView([49.4,17.5],7);L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{attribution:'© OpenStreetMap'}}).addTo(m);
-fetch('routes.geojson').then(r=>r.json()).then(g=>L.geoJSON(g,{{style:f=>({{color:{{fast:'#1f6fe5',normal:'#888',normal_02:'#e8590c',normal_04:'#2b8a3e'}}[f.properties.kind],weight:3}})}}).bindPopup(l=>l.feature.properties.name+' · '+l.feature.properties.kind).addTo(m));</script>"""
+const g={geo};L.geoJSON(g,{{style:f=>({{color:{{fast:'#1f6fe5',normal:'#888',normal_02:'#e8590c',normal_04:'#2b8a3e'}}[f.properties.kind],weight:3}})}}).bindPopup(l=>l.feature.properties.name+' · '+l.feature.properties.kind).addTo(m);</script>"""
     open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(html)
     print(f"Hotovo: {len(rows)} tras, {failures} chyb")
     if failures > len(rows):  # more than a third of requests failed
