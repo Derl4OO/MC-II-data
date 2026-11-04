@@ -9,7 +9,7 @@ def shield(fill, border, r):
 def poi(kind, fill, ring, r):
     s = 24*r
     im = Image.new("RGBA", (s, s), (0,0,0,0)); d = ImageDraw.Draw(im)
-    d.ellipse([r, r, s-1-r, s-1-r], fill=fill, outline=ring, width=2*r)
+    d.rounded_rectangle([r, r, s-1-r, s-1-r], radius=6*r, fill=fill, outline=ring, width=2*r)   # rounded square like the apps (Julien 4. 11.)
     W = (255,255,255,255)
     if kind == "fuel":
         d.rounded_rectangle([7*r, 6*r, 14*r, 18*r], radius=1*r, fill=W)       # pump
@@ -24,7 +24,7 @@ def place(kind, fill, ring, r):
     """Our places (MC-II-data sights): castle, ruins, viewpoint, motorest, waterfall."""
     s = 24*r
     im = Image.new("RGBA", (s, s), (0,0,0,0)); d = ImageDraw.Draw(im)
-    d.ellipse([r, r, s-1-r, s-1-r], fill=fill, outline=ring, width=2*r)
+    d.rounded_rectangle([r, r, s-1-r, s-1-r], radius=6*r, fill=fill, outline=ring, width=2*r)
     W = (255,255,255,255); lw = max(1, int(1.4*r))
     if kind in ("castle", "ruins"):
         d.rectangle([7*r, 10*r, 17*r, 17*r], fill=W)
@@ -57,13 +57,13 @@ def arrow(color, r):
 def sheet(r):
     items = [("shield-main-day", shield((251,210,122,255),(179,154,120,255),r)), ("shield-day", shield((255,255,255,255),(179,163,140,255),r)),
              ("shield-main-night", shield((90,78,52,255),(217,183,104,255),r)), ("shield-night", shield((44,48,56,255),(125,130,142,255),r)),
-             ("fuel-day", poi("fuel",(232,89,12,255),(255,255,255,255),r)), ("cafe-day", poi("cafe",(232,89,12,255),(255,255,255,255),r)),
-             ("fuel-night", poi("fuel",(240,106,31,255),(27,30,36,255),r)), ("cafe-night", poi("cafe",(240,106,31,255),(27,30,36,255),r)),
-             ("castle-day", place("castle",(139, 90, 43, 255),(255,255,255,255),r)), ("castle-night", place("castle",(139, 90, 43, 255),(31,29,27,255),r)),
-             ("ruins-day", place("ruins",(128, 112, 96, 255),(255,255,255,255),r)), ("ruins-night", place("ruins",(128, 112, 96, 255),(31,29,27,255),r)),
-             ("viewpoint-day", place("viewpoint",(47, 158, 68, 255),(255,255,255,255),r)), ("viewpoint-night", place("viewpoint",(47, 158, 68, 255),(31,29,27,255),r)),
-             ("motorest-day", place("motorest",(232, 89, 12, 255),(255,255,255,255),r)), ("motorest-night", place("motorest",(232, 89, 12, 255),(31,29,27,255),r)),
-             ("waterfall-day", place("waterfall",(28, 126, 214, 255),(255,255,255,255),r)), ("waterfall-night", place("waterfall",(28, 126, 214, 255),(31,29,27,255),r)),
+             ("fuel-day", poi("fuel",(222,79,38,255),(255,255,255,255),r)), ("cafe-day", poi("cafe",(140,89,43,255),(255,255,255,255),r)),
+             ("fuel-night", poi("fuel",(222,79,38,255),(27,30,36,255),r)), ("cafe-night", poi("cafe",(140,89,43,255),(27,30,36,255),r)),
+             ("castle-day", place("castle",(89, 79, 207, 255),(255,255,255,255),r)), ("castle-night", place("castle",(89, 79, 207, 255),(31,29,27,255),r)),
+             ("ruins-day", place("ruins",(89, 79, 207, 255),(255,255,255,255),r)), ("ruins-night", place("ruins",(89, 79, 207, 255),(31,29,27,255),r)),
+             ("viewpoint-day", place("viewpoint",(46, 143, 79, 255),(255,255,255,255),r)), ("viewpoint-night", place("viewpoint",(46, 143, 79, 255),(31,29,27,255),r)),
+             ("motorest-day", place("motorest",(107, 66, 31, 255),(255,255,255,255),r)), ("motorest-night", place("motorest",(107, 66, 31, 255),(31,29,27,255),r)),
+             ("waterfall-day", place("waterfall",(46, 143, 79, 255),(255,255,255,255),r)), ("waterfall-night", place("waterfall",(46, 143, 79, 255),(31,29,27,255),r)),
              ("oneway-day", arrow((140,128,110,255),r)), ("oneway-night", arrow((150,142,130,255),r))]
     W = sum(i[1][0].width for i in items) + 2*len(items); H = max(i[1][0].height for i in items)
     out = Image.new("RGBA", (W, H), (0,0,0,0)); meta = {}; x = 0

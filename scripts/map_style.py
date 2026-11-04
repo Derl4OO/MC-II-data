@@ -311,10 +311,10 @@ def tune(layers, p, major_w, minor_w, name):
            "layout": {"icon-image": ["concat", ["get", "k"], f"-{name}"], "icon-size": width([(10, 0.7), (16, 1.05)]),
                       "text-field": ["step", ["zoom"], "", 13, ["get", "n"]], "text-font": REGULAR, "text-size": 12,
                       "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": True, "text-max-width": 9},
-           # Fade in with zoom, not a jump: places to visit from 10, motorests from 13 (Julien 3. 11.).
+           # Fade in with zoom, not a jump: places to visit from 10, motorests from 12 (Julien 3. a 4. 11.).
            "paint": {"text-color": p["label_soft"], "text-halo-color": p["halo"], "text-halo-width": 1.5,
                      "icon-opacity": ["interpolate", ["linear"], ["zoom"], 9.5, 0, 10.3, ["case", ["==", ["get", "k"], "motorest"], 0, 1],
-                                      12.5, ["case", ["==", ["get", "k"], "motorest"], 0, 1], 13.3, 1],
+                                      11.3, ["case", ["==", ["get", "k"], "motorest"], 0, 1], 12, 1],
                      "text-opacity": ["interpolate", ["linear"], ["zoom"], 12.6, 0, 13.3, 1]}})
     # Road numbers in shields (main roads yellow, others white) and icons for fuel and cafés.
     for layer in layers:
@@ -327,9 +327,10 @@ def tune(layers, p, major_w, minor_w, name):
             layer["paint"] = {"text-color": p["label"]}
         if layer["id"] == "poi-rider":
             layer.update({"type": "symbol", "layout": {
-                "icon-image": ["concat", ["get", "class"], f"-{name}"], "icon-size": width([(13, 0.75), (17, 1.1)]),
+                "icon-image": ["concat", ["get", "class"], f"-{name}"], "icon-size": width([(12, 0.65), (17, 1.1)]),
                 "icon-allow-overlap": True},
-                "paint": {"icon-opacity": ["interpolate", ["linear"], ["zoom"], 12.5, 0, 13.3, 1]}, "minzoom": 12.5})
+                # Fuel and cafés already when the whole town is on screen (zoom 12, Julien 4. 11.); names from 15.
+                "paint": {"icon-opacity": ["interpolate", ["linear"], ["zoom"], 11.3, 0, 12, 1]}, "minzoom": 11.3})
     for layer in layers:
         if layer["id"].startswith("place-"):
             layer["layout"]["symbol-sort-key"] = ["coalesce", ["get", "rank"], 99]
