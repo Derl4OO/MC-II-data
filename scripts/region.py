@@ -77,6 +77,8 @@ def run(cc, work, out):
                                        lambda t: t.get("amenity") == "fuel")
     build.extract_sights(work)
     stats["sights"] = build.build_sights(work, os.path.join(out, "sights.json"))
+    # Rule 2 (4. 11.): cafés and motorests only with opening hours, web or phone – fewer on purpose.
+    stats["sightsRule"] = 2
     build.extract_pois(work, None if info.get("limits") else build.POI_FILTERS_FOREIGN)
     rows = build.poi_rows(work, out)
     with gzip.open(os.path.join(out, "pois.json.gz"), "wt", encoding="utf-8") as f:
@@ -98,6 +100,9 @@ def sane(stats, previous):
     problems = []
     for key in CHECKED:
         old, new = (previous or {}).get(key), stats.get(key)
+        # A planned change of the rule (fewer places on purpose) is not a drop.
+        if key == "sights" and (previous or {}).get("sightsRule") != stats.get("sightsRule"):
+            continue
         if isinstance(old, (int, float)) and old >= 100 and (new or 0) < old * DROP:
             problems.append(f"{key}: {new} (minule {old})")
     return problems

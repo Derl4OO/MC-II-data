@@ -448,11 +448,23 @@ def sight_kind(tags):
         return "waterfall"
     if tags.get("natural") == "peak" and tags.get("ele"):
         return "peak"
-    if tags.get("amenity") == "cafe":
+    if tags.get("amenity") == "cafe" and seems_open(tags):
         return "cafe"
-    if tags.get("amenity") == "restaurant" and MOTOREST_RE.search(tags.get("name", "")):
+    if tags.get("amenity") == "restaurant" and MOTOREST_RE.search(tags.get("name", "")) and seems_open(tags):
         return "motorest"
     return None
+
+# Cafés and motorests only when someone keeps them up to date in OpenStreetMap: opening hours, a website
+# or a phone; never ones marked closed. Fewer closed places in "Překvap mě" and on the map (Julien 4. 11.).
+ALIVE_TAGS = ("opening_hours", "website", "contact:website", "phone", "contact:phone", "contact:facebook")
+CLOSED_RE = re.compile(r"zavřen|zatvoren|closed|geschlossen|ferm[ée]", re.I)
+
+def seems_open(tags):
+    if any(k.startswith(("disused:", "abandoned:", "was:")) for k in tags) or tags.get("opening_hours") == "closed":
+        return False
+    if CLOSED_RE.search(tags.get("name", "")) or CLOSED_RE.search(tags.get("note", "")):
+        return False
+    return any(tags.get(k) for k in ALIVE_TAGS)
 
 def build_sights(work, out_path):
     tmp = out_path + ".tmp.json"
