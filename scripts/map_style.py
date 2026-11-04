@@ -308,13 +308,16 @@ def tune(layers, p, major_w, minor_w, name):
     # Our places from MC-II-data (castles, ruins, viewpoints, waterfalls, motorests).
     after("poi-rider-name",
           {"id": "places", "type": "symbol", "source": "moto", "source-layer": "places", "minzoom": 9.5,
-           "layout": {"icon-image": ["concat", ["get", "k"], f"-{name}"], "icon-size": width([(10, 0.7), (16, 1.05)]),
+           # Big icons (the apps draw them, 32 pt) with names from 13; fuel and cafés are ours too now (filtered,
+           # today's brand names), the base map's fuel / café dots are off (Julien 4. 11.).
+           "layout": {"icon-image": ["concat", ["get", "k"], f"-{name}"], "icon-size": width([(10, 0.8), (13, 1.0), (16, 1.15)]),
+                      "icon-allow-overlap": False, "symbol-sort-key": ["match", ["get", "k"], "fuel", 1, "castle", 2, 3],
                       "text-field": ["step", ["zoom"], "", 13, ["get", "n"]], "text-font": REGULAR, "text-size": 12,
                       "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": True, "text-max-width": 9},
            # Fade in with zoom, not a jump: places to visit from 10, motorests from 12 (Julien 3. a 4. 11.).
            "paint": {"text-color": p["label_soft"], "text-halo-color": p["halo"], "text-halo-width": 1.5,
-                     "icon-opacity": ["interpolate", ["linear"], ["zoom"], 9.5, 0, 10.3, ["case", ["==", ["get", "k"], "motorest"], 0, 1],
-                                      11.3, ["case", ["==", ["get", "k"], "motorest"], 0, 1], 12, 1],
+                     "icon-opacity": ["interpolate", ["linear"], ["zoom"], 9.5, 0, 10.3, ["case", ["in", ["get", "k"], ["literal", ["motorest", "fuel", "cafe"]]], 0, 1],
+                                      11.3, ["case", ["in", ["get", "k"], ["literal", ["motorest", "fuel", "cafe"]]], 0, 1], 12, 1],
                      "text-opacity": ["interpolate", ["linear"], ["zoom"], 12.6, 0, 13.3, 1]}})
     # Road numbers in shields (main roads yellow, others white) and icons for fuel and cafés.
     for layer in layers:
@@ -325,10 +328,12 @@ def tune(layers, p, major_w, minor_w, name):
                 "icon-text-fit": "both", "icon-text-fit-padding": [1, 3, 1, 3], "icon-rotation-alignment": "viewport",
                 "text-size": 11, "symbol-spacing": 500})
             layer["paint"] = {"text-color": p["label"]}
+        if layer["id"] in ("poi-rider", "poi-rider-name"):
+            layer.setdefault("layout", {})["visibility"] = "none"  # our own fuel and cafés in "places" instead (4. 11.)
         if layer["id"] == "poi-rider":
             layer.update({"type": "symbol", "layout": {
                 "icon-image": ["concat", ["get", "class"], f"-{name}"], "icon-size": width([(12, 0.65), (17, 1.1)]),
-                "icon-allow-overlap": True},
+                "icon-allow-overlap": True, "visibility": "none"},
                 # Fuel and cafés already when the whole town is on screen (zoom 12, Julien 4. 11.); names from 15.
                 "paint": {"icon-opacity": ["interpolate", ["linear"], ["zoom"], 11.3, 0, 12, 1]}, "minzoom": 11.3})
     for layer in layers:

@@ -18,7 +18,24 @@ import sys
 LEVEL1, LEVEL2 = 3.0, 6.0  # bends per km (window 2 km)
 KINDS = {"trunk", "primary", "secondary", "tertiary", "unclassified"}
 PLACES = {"castle": "castle", "chateau": "castle", "ruins": "ruins", "viewpoint": "viewpoint",
-          "waterfall": "waterfall", "motorest": "motorest"}
+          "waterfall": "waterfall", "motorest": "motorest", "cafe": "cafe"}
+
+
+def fuel_places(path):
+    """Fuel stations from fuel.json as map places (k "fuel"): our own, filtered, with today's brand names (4. 11.)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            elements = json.load(f)["elements"]
+    except (OSError, ValueError, KeyError):
+        return []
+    out = []
+    for e in elements:
+        lat = e["lat"] if "lat" in e else e["center"]["lat"]
+        lon = e["lon"] if "lon" in e else e["center"]["lon"]
+        tags = e.get("tags", {})
+        raw = tags.get("brand") or tags.get("name") or tags.get("operator") or "Čerpací stanice"
+        out.append((lon, lat, "ORLEN" if "benzina" in raw.lower() else raw, "fuel"))
+    return out
 ZOOMS = range(8, 13)
 EXTENT, BUFFER = 4096, 64
 STEP = 20.0
@@ -304,6 +321,7 @@ def main(work, out):
                     places.append((lon, lat, name, PLACES[kind]))
     except (OSError, ValueError, KeyError) as error:
         print("::warning::Místa pro mapu chybí:", error)
+    places += fuel_places(os.path.join(out, "fuel.json"))
     count = build_tiles(runs, places, out)
     print("Zatáčky na mapě: %d km lehčích, %d km ostřejších, %d míst, %d dlaždic" % (km[1], km[2], len(places), count))
     return {"curvesKm": {"light": round(km[1]), "sharp": round(km[2])}, "places": len(places), "tiles": count}

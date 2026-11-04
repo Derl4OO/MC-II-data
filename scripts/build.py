@@ -501,6 +501,21 @@ def extract_pois(work, filters=None):
         except (OSError, subprocess.CalledProcessError) as error:
             print("Katalog míst se nepodařilo vybrat:", error)
 
+# Fuel stations: only real ones (a car dealer or a garage with a pump for its own cars is not one) and with
+# today's brand names (Benzina is ORLEN since 2024). Same rules as in the apps (Julien 4. 11.).
+NOT_FUEL_RE = re.compile(r"\bauto|servis|service|pneu|autosalon|car ?wash|myčk|karosár|garáž|garage", re.I)
+
+def is_fuel_station(tags):
+    if tags.get("amenity") != "fuel" or tags.get("shop") == "car" or tags.get("disused") == "yes":
+        return False
+    if any(k.startswith(("disused:", "abandoned:")) for k in tags):
+        return False
+    return bool(tags.get("brand")) or not NOT_FUEL_RE.search(tags.get("name", ""))
+
+def fuel_name(tags):
+    raw = tags.get("brand") or tags.get("name") or tags.get("operator") or "Čerpací stanice"
+    return "ORLEN" if "benzina" in raw.lower() else raw
+
 def poi_kind(tags):
     shop, amenity, tourism, historic = tags.get("shop"), tags.get("amenity"), tags.get("tourism"), tags.get("historic")
     place = tags.get("place")
@@ -514,7 +529,7 @@ def poi_kind(tags):
     if amenity == "restaurant": return "motorest" if MOTOREST_RE.search(tags.get("name", "")) else "restaurant"
     if amenity == "fast_food": return "fast_food"
     if amenity in ("pub", "bar"): return "pub"
-    if amenity == "fuel": return "fuel"
+    if amenity == "fuel": return "fuel" if is_fuel_station(tags) else None
     if amenity == "motorcycle_parking": return "parking_moto"
     if amenity == "parking": return "parking"
     if amenity == "pharmacy": return "pharmacy"
@@ -557,8 +572,8 @@ def poi_rows(work, tmp_dir):
         lat = e["lat"] if "lat" in e else e["center"]["lat"]
         lon = e["lon"] if "lon" in e else e["center"]["lon"]
         tags = e["tags"]
-        name = tags.get("name") or tags.get("brand") or "Parkování motorek"
         kind = poi_kind(tags)
+        name = fuel_name(tags) if kind == "fuel" else (tags.get("name") or tags.get("brand") or "Parkování motorek")
         rows.append([round(lat, 5), round(lon, 5), name, kind, tags.get("addr:city") or tags.get("addr:place") or "",
                      tags.get("brand", "")])
     return rows
@@ -599,8 +614,7 @@ def main(work, site):
         print("::warning::Víc než 5 % úseků silnic nemá limit – zkontroluj zástavbu (urbanCells) a značky obcí.")
     cams = build_points(sorted(glob.glob(os.path.join(work, "cams-*.opl"))), os.path.join(out, "radars.json"),
                         lambda t: t.get("highway") == "speed_camera")
-    fuel = build_points(sorted(glob.glob(os.path.join(work, "fuel-*.opl"))), os.path.join(out, "fuel.json"),
-                        lambda t: t.get("amenity") == "fuel")
+    fuel = build_points(sorted(glob.glob(os.path.join(work, "fuel-*.opl"))), os.path.join(out, "fuel.json"), is_fuel_station)
     extract_sights(work)
     # Not critical: without sights "Překvap mě" uses its built-in list, so a failure does not stop the deploy.
     sights = build_sights(work, os.path.join(out, "sights.json"))

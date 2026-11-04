@@ -73,8 +73,7 @@ def run(cc, work, out):
         stats["limits"] = dict(build.LIMIT_STATS)
     stats["cams"] = build.build_points([os.path.join(work, f"cams-{cc}.opl")], os.path.join(out, "radars.json"),
                                        lambda t: t.get("highway") == "speed_camera")
-    stats["fuel"] = build.build_points([os.path.join(work, f"fuel-{cc}.opl")], os.path.join(out, "fuel.json"),
-                                       lambda t: t.get("amenity") == "fuel")
+    stats["fuel"] = build.build_points([os.path.join(work, f"fuel-{cc}.opl")], os.path.join(out, "fuel.json"), build.is_fuel_station)
     build.extract_sights(work)
     stats["sights"] = build.build_sights(work, os.path.join(out, "sights.json"))
     # Rule 2 (4. 11.): cafés and motorests only with opening hours, web or phone – fewer on purpose.

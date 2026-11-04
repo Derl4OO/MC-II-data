@@ -175,6 +175,7 @@ def main(parts, work, site, pages=None):
         for lat, lon, name, kind in read_json(os.path.join(parts, cc, "sights.json"), {"sights": []})["sights"]:
             if kind in moto_tiles.PLACES:
                 places.append((lon, lat, name, moto_tiles.PLACES[kind]))
+        places += moto_tiles.fuel_places(os.path.join(parts, cc, "fuel.json"))
     tiles = moto_tiles.build_tiles(runs, places, out)
     print("Vrstva mapy: %d úseků zatáček, %d míst, %d dlaždic" % (len(runs), len(places), tiles))
 
