@@ -1,8 +1,9 @@
 {
   "routing": {
-    "provider": "mapbox",
-    "url": "",
-    "key": ""
+    "provider": "valhalla",
+    "url": "https://valhalla1.openstreetmap.de",
+    "key": "",
+    "_info": "TEST (4. 11. 2026): veřejný server FOSSGIS – jen pro testování pár lidí, ne pro vydání. Zpět na Mapbox: provider \"mapbox\"."
   },
   "data": {
     "url": "https://pub-15c918f368aa43dc85e3ec15c72e311c.r2.dev/v1/",
