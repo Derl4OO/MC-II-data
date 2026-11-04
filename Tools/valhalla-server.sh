@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vlastní server tras MotoCesty (Valhalla) na Oracle Cloud Always Free (Ubuntu 24.04, ARM).
+# Vlastní server tras MotoCesty (Valhalla) na serveru s Ubuntu 24.04 (např. Hetzner, 8–16 GB paměti).
 # Spuštění na serveru:  curl -fsSL https://raw.githubusercontent.com/Derl4OO/MC-II-data/main/Tools/valhalla-server.sh | bash
 # Na konci vypíše adresu a klíč – ty patří do config/app.json (routing.url a routing.key).
 set -euo pipefail
